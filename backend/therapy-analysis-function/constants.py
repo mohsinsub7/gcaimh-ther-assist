@@ -31,7 +31,7 @@ THERAPY_PHASES = {
 }
 
 # Prompts
-REALTIME_ANALYSIS_PROMPT = """Analyze this therapy segment for real-time guidance using a Cognitive Behavioral Therapy approach.
+REALTIME_ANALYSIS_PROMPT = """Analyze this therapy segment for real-time guidance using a {current_approach} approach.
 
 TRANSCRIPT (last few sentences):
 {transcript_text}
@@ -77,7 +77,7 @@ If guidance is needed, prioritize actionable guidance and return only the MOST R
 IMPORTANT NOTE:
 Always refer to the patient as 'patient'"""
 
-REALTIME_ANALYSIS_PROMPT_STRICT = """Analyze this therapy segment for CRITICAL guidance only using a Cognitive Behavioral Therapy approach.
+REALTIME_ANALYSIS_PROMPT_STRICT = """Analyze this therapy segment for CRITICAL guidance only using a {current_approach} approach.
 
 TRANSCRIPT (last few sentences):
 {transcript_text}
@@ -156,8 +156,8 @@ Analyze this therapy session segment step by step:
 1. Check for any safety concerns (dissociation, panic, suicidal ideation)
 2. Evaluate therapeutic process metrics (engagement, alliance, techniques)
 3. Assess if current approach is effective or needs adjustment
-4. Search for similar patterns in clinical transcripts (Beck sessions, PTSD sessions)
-5. Reference EBT manuals for evidence-based protocols
+4. Search for similar patterns in clinical transcripts relevant to the current therapeutic approach
+5. Reference evidence-based manuals and protocols for the current modality
 6. Provide specific pathway guidance regardless of effectiveness
 </thinking>
 
@@ -175,10 +175,10 @@ CURRENT SESSION CONTEXT:
 TRANSCRIPT SEGMENT:
 {transcript_text}
 
-IMPORTANT: 
+IMPORTANT:
 - Look for similar patterns in the transcript database (e.g., "client resistance", "overwhelm", "not ready")
-- Reference EBT manual protocols with citations [1], [2], etc.
-- If you find a similar moment in Beck or PTSD sessions, mention how it was handled
+- Reference evidence-based manual protocols with citations [1], [2], etc.
+- If you find a similar moment in clinical transcripts, mention how it was handled
 - ALWAYS provide pathway guidance details (rationale, actions, contraindications) regardless of effectiveness
 
 Provide analysis with a JSON response only, no other text should exist besides the JSON. Format::
@@ -285,7 +285,7 @@ Format as structured JSON:
         {{
             "task": "description",
             "rationale": "why",
-            "manual_reference": "CBT Manual p.X"
+            "manual_reference": "Treatment Manual p.X or protocol reference"
         }}
     ],
     "follow_up_recommendations": ["recommendation1", "recommendation2"],

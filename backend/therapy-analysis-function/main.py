@@ -221,21 +221,13 @@ try:
 except Exception as e:
     logging.error(f"CRITICAL: Error initializing Google GenAI: {e}", exc_info=True)
 
-# Configure RAG tools with EBT manuals, CBT research, and transcript patterns
+# Configure RAG tools with EBT manuals, modality-specific research, and transcript patterns
+# ── Core RAG Tools (always available) ──────────────────────────────────────────
 # EBT Manuals RAG Tool - therapy treatment manuals (PE, CBT-Social Phobia, Deliberate Practice)
 MANUAL_RAG_TOOL = types.Tool(
     retrieval=types.Retrieval(
         vertex_ai_search=types.VertexAISearch(
             datastore=f"projects/{project_id}/locations/us/collections/default_collection/dataStores/ebt-corpus"
-        )
-    )
-)
-
-# CBT Clinical Research RAG Tool - 31 randomized controlled trials and clinical studies
-CBT_RAG_TOOL = types.Tool(
-    retrieval=types.Retrieval(
-        vertex_ai_search=types.VertexAISearch(
-            datastore=f"projects/{project_id}/locations/us/collections/default_collection/dataStores/cbt-corpus"
         )
     )
 )
@@ -248,6 +240,82 @@ TRANSCRIPT_RAG_TOOL = types.Tool(
         )
     )
 )
+
+# ── Modality-Specific RAG Tools ────────────────────────────────────────────────
+# CBT Clinical Research - 31 randomized controlled trials and clinical studies
+CBT_RAG_TOOL = types.Tool(
+    retrieval=types.Retrieval(
+        vertex_ai_search=types.VertexAISearch(
+            datastore=f"projects/{project_id}/locations/us/collections/default_collection/dataStores/cbt-corpus"
+        )
+    )
+)
+
+# BA (Behavioral Activation) Clinical Research - 11 RCTs and treatment studies
+BA_RAG_TOOL = types.Tool(
+    retrieval=types.Retrieval(
+        vertex_ai_search=types.VertexAISearch(
+            datastore=f"projects/{project_id}/locations/us/collections/default_collection/dataStores/ba-corpus"
+        )
+    )
+)
+
+# DBT (Dialectical Behavior Therapy) Clinical Research - 6 RCTs and systematic reviews
+DBT_RAG_TOOL = types.Tool(
+    retrieval=types.Retrieval(
+        vertex_ai_search=types.VertexAISearch(
+            datastore=f"projects/{project_id}/locations/us/collections/default_collection/dataStores/dbt-corpus"
+        )
+    )
+)
+
+# IPT (Interpersonal Psychotherapy) Clinical Research - 10 RCTs and meta-analyses
+IPT_RAG_TOOL = types.Tool(
+    retrieval=types.Retrieval(
+        vertex_ai_search=types.VertexAISearch(
+            datastore=f"projects/{project_id}/locations/us/collections/default_collection/dataStores/ipt-corpus"
+        )
+    )
+)
+
+# ── Modality → RAG Tool Mapping ────────────────────────────────────────────────
+MODALITY_RAG_MAP = {
+    "CBT": CBT_RAG_TOOL,
+    "BA": BA_RAG_TOOL,
+    "DBT": DBT_RAG_TOOL,
+    "IPT": IPT_RAG_TOOL,
+    # Exposure-based approaches use EBT manuals + CBT corpus (PE is in ebt-corpus)
+    "Exposure": CBT_RAG_TOOL,
+    "ACT": CBT_RAG_TOOL,  # ACT shares cognitive-behavioral evidence base
+}
+
+def get_rag_tools_for_session(session_context, is_realtime=False):
+    """Select RAG tools based on the session's therapeutic modality.
+
+    Always includes MANUAL_RAG_TOOL (core EBT protocols).
+    Adds modality-specific research corpus based on session_type.
+    For comprehensive (non-realtime), also adds TRANSCRIPT_RAG_TOOL.
+
+    Returns: list of types.Tool objects
+    """
+    session_type = session_context.get("session_type", "CBT") if session_context else "CBT"
+
+    # Core: always include EBT manuals
+    tools = [MANUAL_RAG_TOOL]
+
+    # Add modality-specific research corpus
+    modality_tool = MODALITY_RAG_MAP.get(session_type, CBT_RAG_TOOL)
+    tools.append(modality_tool)
+
+    # For comprehensive analysis, also include transcript patterns
+    if not is_realtime:
+        tools.append(TRANSCRIPT_RAG_TOOL)
+
+    modality_tool_name = session_type.lower() + "-corpus" if session_type in MODALITY_RAG_MAP else "cbt-corpus"
+    logging.info(f"[RAG] Session type '{session_type}' → tools: ebt-corpus + {modality_tool_name}"
+                 f"{' + transcript-patterns' if not is_realtime else ''}")
+
+    return tools
 
 @functions_framework.http
 def therapy_analysis(request):
@@ -354,7 +422,8 @@ Timing: {previous_alert.get('timing', 'N/A')}
         if is_realtime:
             # For realtime analysis, we'll use a retry mechanism with two different prompts
             return handle_realtime_analysis_with_retry(
-                transcript_segment, transcript_text, previous_alert_context, phase, headers, job_id
+                transcript_segment, transcript_text, previous_alert_context, phase, headers, job_id,
+                session_context=session_context
             )
         else:
             # COMPREHENSIVE PATH: Full analysis with RAG
@@ -368,7 +437,9 @@ Timing: {previous_alert.get('timing', 'N/A')}
                 transcript_text=transcript_text
             )
 
-            return handle_comprehensive_analysis(analysis_prompt, phase, headers, job_id)
+            # Select modality-specific RAG tools
+            rag_tools = get_rag_tools_for_session(session_context, is_realtime=False)
+            return handle_comprehensive_analysis(analysis_prompt, phase, headers, job_id, rag_tools=rag_tools)
         
     except Exception as e:
         logging.exception(f"Error in handle_segment_analysis: {str(e)}")
@@ -391,15 +462,23 @@ def check_for_trigger_phrases(transcript_segment):
     
     return False
 
-def handle_realtime_analysis_with_retry(transcript_segment, transcript_text, previous_alert_context, phase, headers, job_id=None):
+def handle_realtime_analysis_with_retry(transcript_segment, transcript_text, previous_alert_context, phase, headers, job_id=None, session_context=None):
     """Handle realtime analysis with retry mechanism using different prompts"""
-    
+
+    # Select modality-specific RAG tools for realtime
+    realtime_rag_tools = get_rag_tools_for_session(session_context, is_realtime=True)
+    _session_type = (session_context or {}).get("session_type", "CBT")
+    _modality_ds = _session_type.lower() + "-corpus" if _session_type in MODALITY_RAG_MAP else "cbt-corpus"
+    _realtime_rag_tool_names = ["ebt-corpus", _modality_ds]
+
     def try_analysis_with_prompt(prompt_template, prompt_name):
         """Helper function to try analysis with a specific prompt"""
         try:
+            current_approach = (session_context or {}).get('current_approach', 'Cognitive Behavioral Therapy')
             analysis_prompt = prompt_template.format(
                 transcript_text=transcript_text,
-                previous_alert_context=previous_alert_context
+                previous_alert_context=previous_alert_context,
+                current_approach=current_approach
             )
 
             contents = [types.Content(
@@ -430,7 +509,7 @@ def handle_realtime_analysis_with_retry(transcript_segment, transcript_text, pre
                         threshold="OFF"
                     )
                 ],
-                tools=[MANUAL_RAG_TOOL, CBT_RAG_TOOL],  # RAG always on for evidence-based guardrailing
+                tools=realtime_rag_tools,  # Modality-specific RAG for evidence-based guardrailing
             )
 
             logging.info(f"[TIMING] Trying realtime analysis with {prompt_name}")
@@ -500,7 +579,7 @@ def handle_realtime_analysis_with_retry(transcript_segment, transcript_text, pre
                     temperature=0.0,
                     max_output_tokens=2048,
                     thinking_budget=None,
-                    rag_tools=["ebt-corpus", "cbt-corpus"],
+                    rag_tools=_realtime_rag_tool_names,
                     start_time=rt_start,
                     ttft=rt_ttft,
                     end_time=rt_end,
@@ -523,7 +602,7 @@ def handle_realtime_analysis_with_retry(transcript_segment, transcript_text, pre
                     temperature=0.0,
                     max_output_tokens=2048,
                     thinking_budget=None,
-                    rag_tools=["ebt-corpus", "cbt-corpus"],
+                    rag_tools=_realtime_rag_tool_names,
                     start_time=rt_start,
                     ttft=rt_ttft,
                     end_time=rt_end,
@@ -632,7 +711,7 @@ def handle_realtime_analysis_with_retry(transcript_segment, transcript_text, pre
     
     return Response(generate(), mimetype='text/plain', headers=headers)
 
-def handle_comprehensive_analysis(analysis_prompt, phase, headers, job_id=None):
+def handle_comprehensive_analysis(analysis_prompt, phase, headers, job_id=None, rag_tools=None):
     """Handle comprehensive analysis (non-realtime)"""
     
     def generate():
@@ -675,10 +754,22 @@ def handle_comprehensive_analysis(analysis_prompt, phase, headers, job_id=None):
                         threshold="OFF"
                     )
                 ],
-                tools=[MANUAL_RAG_TOOL, CBT_RAG_TOOL, TRANSCRIPT_RAG_TOOL],
+                tools=rag_tools or [MANUAL_RAG_TOOL, CBT_RAG_TOOL, TRANSCRIPT_RAG_TOOL],
             )
 
-            logging.info(f"[TIMING] Calling Gemini model '{constants.MODEL_NAME_PRO}' for comprehensive analysis (no thinking config - RAG compatibility)")
+            # Compute tool names for diagnostics
+            _comp_tool_names = []
+            if rag_tools:
+                for t in rag_tools:
+                    try:
+                        ds_path = t.retrieval.vertex_ai_search.datastore
+                        _comp_tool_names.append(ds_path.split("/")[-1])
+                    except Exception:
+                        _comp_tool_names.append("unknown")
+            else:
+                _comp_tool_names = ["ebt-corpus", "cbt-corpus", "transcript-patterns"]
+
+            logging.info(f"[TIMING] Calling Gemini model '{constants.MODEL_NAME_PRO}' for comprehensive analysis with RAG tools: {_comp_tool_names}")
 
             # Stream the response from the model
             comp_start = time.perf_counter()
@@ -760,7 +851,7 @@ def handle_comprehensive_analysis(analysis_prompt, phase, headers, job_id=None):
                     temperature=0.3,
                     max_output_tokens=4096,
                     thinking_budget=None,  # disabled for RAG compatibility
-                    rag_tools=["ebt-corpus", "cbt-corpus", "transcript-patterns"],
+                    rag_tools=_comp_tool_names,
                     start_time=comp_start,
                     ttft=comp_ttft,
                     end_time=comp_end,
@@ -784,7 +875,7 @@ def handle_comprehensive_analysis(analysis_prompt, phase, headers, job_id=None):
                         temperature=0.3,
                         max_output_tokens=4096,
                         thinking_budget=None,
-                        rag_tools=["ebt-corpus", "cbt-corpus", "transcript-patterns"],
+                        rag_tools=_comp_tool_names,
                         start_time=comp_start,
                         ttft=comp_ttft,
                         end_time=comp_end,
@@ -808,28 +899,32 @@ def handle_pathway_guidance(request_json, headers):
         current_approach = request_json.get('current_approach', '')
         session_history = request_json.get('session_history', [])
         presenting_issues = request_json.get('presenting_issues', [])
-        
+        session_context = request_json.get('session_context', {})
+
         logging.info(f"Pathway guidance request for approach: {current_approach}")
-        
+
         # Format session history
         history_summary = summarize_session_history(session_history)
-        
+
         # Create pathway guidance prompt
         guidance_prompt = constants.PATHWAY_GUIDANCE_PROMPT.format(
             current_approach=current_approach,
             presenting_issues=', '.join(presenting_issues),
             history_summary=history_summary
         )
-        
+
         contents = [types.Content(
             role="user",
             parts=[types.Part(text=guidance_prompt)]
         )]
-        
+
+        # Select modality-specific RAG tools (realtime=True → no transcript patterns)
+        pathway_rag_tools = get_rag_tools_for_session(session_context, is_realtime=True)
+
         config = types.GenerateContentConfig(
             temperature=0.2,
             max_output_tokens=2048,
-            tools=[MANUAL_RAG_TOOL, CBT_RAG_TOOL],
+            tools=pathway_rag_tools,
             thinking_config=types.ThinkingConfig(
                 thinking_budget=24576,  # Complex clinical reasoning
                 include_thoughts=False
@@ -919,25 +1014,29 @@ def handle_session_summary(request_json, headers):
     try:
         full_transcript = request_json.get('full_transcript', [])
         session_metrics = request_json.get('session_metrics', {})
-        
+        session_context = request_json.get('session_context', {})
+
         logging.info(f"Session summary request - transcript length: {len(full_transcript)}")
-        
+
         transcript_text = format_transcript_segment(full_transcript)
-        
+
         summary_prompt = constants.SESSION_SUMMARY_PROMPT.format(
             transcript_text=transcript_text,
             session_metrics=json.dumps(session_metrics, indent=2)
         )
-        
+
         contents = [types.Content(
             role="user",
             parts=[types.Part(text=summary_prompt)]
         )]
-        
+
+        # Select modality-specific RAG tools
+        summary_rag_tools = get_rag_tools_for_session(session_context, is_realtime=True)
+
         config = types.GenerateContentConfig(
             temperature=0.3,
             max_output_tokens=4096,
-            tools=[MANUAL_RAG_TOOL, CBT_RAG_TOOL],
+            tools=summary_rag_tools,
             thinking_config=types.ThinkingConfig(
                 thinking_budget=16384,  # Moderate complexity for summary
                 include_thoughts=False
