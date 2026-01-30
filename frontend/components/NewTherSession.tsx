@@ -183,11 +183,49 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
   const [newTranscriptCount, setNewTranscriptCount] = useState(0);
   const [selectedAlertIndex, setSelectedAlertIndex] = useState<number | null>(null);
   
-  // Session context for AI analysis
-  const [sessionContext] = useState<SessionContext>({
-    session_type: 'CBT',
-    primary_concern: 'Anxiety',
-    current_approach: 'Cognitive Behavioral Therapy',
+  // Session context for AI analysis — derived from patient data
+  const [sessionContext] = useState<SessionContext>(() => {
+    if (patientId) {
+      const patient = mockPatients.find(p => p.id === patientId);
+      if (patient?.focusTopics) {
+        // Parse focusTopics to extract primary concern and approach
+        const topics = patient.focusTopics.split(',').map(t => t.trim());
+        const primaryConcern = topics[0] || 'General';
+
+        // Infer session type / approach from focus topics
+        const topicsLower = patient.focusTopics.toLowerCase();
+        let sessionType = 'CBT';
+        let currentApproach = 'Cognitive Behavioral Therapy';
+        if (topicsLower.includes('emdr')) {
+          sessionType = 'EMDR';
+          currentApproach = 'EMDR Therapy';
+        } else if (topicsLower.includes('exposure therapy')) {
+          sessionType = 'Exposure';
+          currentApproach = 'Exposure and Response Prevention';
+        } else if (topicsLower.includes('behavioral activation')) {
+          sessionType = 'BA';
+          currentApproach = 'Behavioral Activation';
+        } else if (topicsLower.includes('act')) {
+          sessionType = 'ACT';
+          currentApproach = 'Acceptance and Commitment Therapy';
+        } else if (topicsLower.includes('dbt')) {
+          sessionType = 'DBT';
+          currentApproach = 'Dialectical Behavior Therapy';
+        }
+
+        return {
+          session_type: sessionType,
+          primary_concern: primaryConcern,
+          current_approach: currentApproach,
+        };
+      }
+    }
+    // Default when no patient selected (e.g. quick session launch)
+    return {
+      session_type: 'CBT',
+      primary_concern: 'General',
+      current_approach: 'Cognitive Behavioral Therapy',
+    };
   });
   
   // Analysis tracking
@@ -615,8 +653,8 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
     setWordsSinceLastAnalysis(prev => {
       const updatedWordCount = prev + newWords;
       
-      // Trigger analysis every 10 words minimum
-      const WORDS_PER_ANALYSIS = 10;
+      // Trigger analysis every 30 words (~1-2 sentences) for more meaningful context
+      const WORDS_PER_ANALYSIS = 30;
       const TRANSCRIPT_WINDOW_MINUTES = 5;
       
       if (updatedWordCount >= WORDS_PER_ANALYSIS) {
@@ -656,9 +694,9 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
   const getPatientName = () => {
     if (patientId) {
       const patient = mockPatients.find(p => p.id === patientId);
-      return patient?.name || 'John Doe';
+      return patient?.name || 'New Session';
     }
-    return 'John Doe';
+    return 'New Session';
   };
 
   // Determine therapy phase
@@ -690,20 +728,34 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
     // Show real-time alerts for Guidance tab
     if (alerts.length > 0) {
       const recentAlert = alerts[0];
-      const recommendationText = Array.isArray(recentAlert.recommendation) 
-        ? recentAlert.recommendation.join('\n') 
-        : recentAlert.recommendation;
-      
+
+      // Build immediate actions from backend immediateActions first, then fall back to recommendation
+      const backendActions = recentAlert.immediateActions || [];
+      const recommendationItems = Array.isArray(recentAlert.recommendation)
+        ? recentAlert.recommendation
+        : recentAlert.recommendation ? [recentAlert.recommendation] : [];
+      const actionSources = backendActions.length > 0 ? backendActions : recommendationItems;
+
+      const immediateActions = actionSources.map((action) => ({
+        title: action,
+        description: action,
+        icon: 'safety' as const
+      }));
+
+      // Build contraindications from backend contraindications field
+      const backendContraindications = recentAlert.contraindications || [];
+      const contraindications = backendContraindications.map((contra) => ({
+        title: contra,
+        description: contra,
+        icon: 'cognitive' as const
+      }));
+
       return {
         title: recentAlert.title || "Current Clinical Guidance",
         time: formatDuration(sessionDuration),
         content: recentAlert.message || "Real-time guidance available.",
-        immediateActions: recommendationText ? [{
-          title: recommendationText,
-          description: recommendationText,
-          icon: 'safety' as const
-        }] : [],
-        contraindications: []
+        immediateActions,
+        contraindications
       };
     }
     
@@ -915,6 +967,10 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
             testIntervalRef.current = null;
           }
           setIsTestMode(false);
+          setIsRecording(false);
+          setSessionType(null);
+          // Auto-trigger summary when script finishes
+          requestSummary();
           return;
         }
 
@@ -1013,6 +1069,9 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
             testIntervalRef.current = null;
           }
           setIsTestMode(false);
+          setIsRecording(false);
+          setSessionType(null);
+          requestSummary();
           return;
         }
 
@@ -1173,25 +1232,29 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
 
   return (
     <Box sx={{ 
-      display: 'flex', 
-      flexDirection: 'column', 
+      display: 'flex',
+      flexDirection: 'column',
       height: '100vh',
+      maxHeight: '100vh',
       background: '#f0f4f9',
-      p: 2,
+      p: 1.5,
+      overflow: 'hidden',
     }}>
       {/* Main Container */}
-      <Box sx={{ 
-        display: 'flex', 
-        flexDirection: 'column', 
+      <Box sx={{
+        display: 'flex',
+        flexDirection: 'column',
         flex: 1,
+        minHeight: 0,
         backgroundColor: 'white',
         borderRadius: '8px',
         overflow: 'hidden',
       }}>
         {/* Main Content Area */}
-        <Box sx={{ 
-          display: 'flex', 
+        <Box sx={{
+          display: 'flex',
           flex: 1,
+          minHeight: 0,
           overflow: 'hidden',
           position: 'relative',
         }}>
@@ -1208,14 +1271,14 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
             transform: (selectedAction || selectedCitation) ? 'translateX(-100%)' : 'translateX(0)',
             transition: 'transform 0.3s ease-in-out',
             flexDirection: 'column',
-            gap: 3,
-            p: 3,
+            gap: 2,
+            p: 2,
             minHeight: 0,
             overflow: 'hidden',
           }}>
             {/* Title Section */}
             <Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
                 {onNavigateBack && (
                   <Button
                     startIcon={<ArrowBack />}
@@ -1235,18 +1298,18 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
                   >
                   </Button>
                 )}
-                <Typography variant="h6" sx={{ 
-                  fontSize: '28px', 
-                  fontWeight: 600, 
+                <Typography variant="h6" sx={{
+                  fontSize: '20px',
+                  fontWeight: 600,
                   color: '#1f1f1f',
                 }}>
                   {getPatientName()}
                 </Typography>
               </Box>
               <Typography variant="body2" sx={{
-                fontSize: '16px',
+                fontSize: '13px',
                 color: '#444746',
-                mb: 1,
+                mb: 0.5,
               }}>
                 {getCurrentDate()}
               </Typography>
@@ -1265,9 +1328,9 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
                   sx={{
                     display: 'flex',
                     alignItems: 'center',
-                    height: 56,
+                    height: 44,
                     px: 1.5,
-                    py: 1,
+                    py: 0.5,
                     cursor: 'pointer',
                     backgroundColor: activeTab === item.key ? 'rgba(0, 0, 0, 0.04)' : 'transparent',
                     '&:hover': {
@@ -1295,14 +1358,14 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
           </Box>
 
           {/* Main Content */}
-          <Box sx={{ 
+          <Box sx={{
             flex: 1,
             display: 'flex',
             flexDirection: 'column',
-            p: 3,
-            gap: 2,
+            p: 2,
+            gap: 1.5,
             overflow: 'auto',
-            minHeight: 0, // Important for proper flex behavior
+            minHeight: 0,
           }}>
             {activeTab === 'guidance' && (
               <GuidanceTab
@@ -1347,13 +1410,15 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
         </Box>
 
         {/* Timeline Section */}
-        <Box sx={{ 
+        <Box sx={{
           backgroundColor: 'white',
-          p: 2,
+          px: 2,
+          py: 1,
           borderTop: '1px solid #f0f4f9',
+          flexShrink: 0,
         }}>
           {/* Chart Grid */}
-          <Box sx={{ position: 'relative', mb: 1.5 }}>
+          <Box sx={{ position: 'relative', mb: 1 }}>
             <Box sx={{
               backgroundColor: 'white',
               border: '1px solid #e9ebf1',
@@ -1368,32 +1433,31 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
               />
             </Box>
 
-            {/* Event markers */}
-            <Tooltip title="Explore Patient's Internal Experience">
-              <IconButton sx={{ position: 'absolute', bottom: -10, left: 86, transform: 'translateX(-50%)' }}>
-                <Psychology sx={{ fontSize: 20, color: '#c05a01' }} />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Suicidal Ideation Detected">
-              <IconButton sx={{ position: 'absolute', bottom: -10, left: 151, transform: 'translateX(-50%)' }}>
-                <Warning sx={{ fontSize: 20, color: '#db372d' }} />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Explore Patient's Internal Experience">
-              <IconButton sx={{ position: 'absolute', bottom: -10, left: 414, transform: 'translateX(-50%)' }}>
-                <Psychology sx={{ fontSize: 20, color: '#c05a01' }} />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Safety Plan Initiated">
-              <IconButton sx={{ position: 'absolute', bottom: -10, right: 180, transform: 'translateX(50%)' }}>
-                <HealthAndSafety sx={{ fontSize: 20, color: '#128937' }} />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Grounding Exercise">
-              <IconButton sx={{ position: 'absolute', bottom: -10, right: 60, transform: 'translateX(50%)' }}>
-                <NaturePeople sx={{ fontSize: 20, color: '#128937' }} />
-              </IconButton>
-            </Tooltip>
+            {/* Dynamic event markers from actual session alerts */}
+            {alerts.length > 0 && sessionDuration > 0 && alerts
+              .filter(a => a.sessionTime !== undefined)
+              .slice(0, 8) // Show up to 8 markers
+              .map((alert, idx) => {
+                // Position marker proportionally along the timeline
+                const position = Math.max(5, Math.min(95, ((alert.sessionTime || 0) / sessionDuration) * 100));
+                return (
+                  <Tooltip key={idx} title={`${alert.title} (${alert.category})`}>
+                    <IconButton
+                      onClick={() => setSelectedAlertIndex(idx)}
+                      sx={{
+                        position: 'absolute',
+                        bottom: -10,
+                        left: `${position}%`,
+                        transform: 'translateX(-50%)',
+                        p: 0.5,
+                      }}
+                    >
+                      {getCategoryIcon(alert.category)}
+                    </IconButton>
+                  </Tooltip>
+                );
+              })
+            }
           </Box>
 
         </Box>
@@ -1403,56 +1467,90 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
           backgroundColor: 'white',
           borderTop: '1px solid #f0f4f9',
           borderRadius: '0 0 8px 8px',
-          mt: 1.5,
+          flexShrink: 0,
         }}>
           {/* Pathway Header */}
           <Box sx={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            px: 3,
-            py: 2,
+            px: 2,
+            py: 0.5,
             borderBottom: '1px solid #f0f4f9',
           }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Timeline sx={{ fontSize: 24, color: '#444746' }} />
-              <Typography variant="h6" sx={{ fontWeight: 600, color: '#1f1f1f' }}>
-                Cognitive Behavioral Therapy
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Timeline sx={{ fontSize: 20, color: '#444746' }} />
+              <Typography variant="h6" sx={{ fontWeight: 600, color: '#1f1f1f', fontSize: '15px' }}>
+                {sessionContext.current_approach || 'Cognitive Behavioral Therapy'}
               </Typography>
             </Box>
             <Box sx={{ display: 'flex', gap: 1 }}>
-              <Chip
-                icon={<Check sx={{ fontSize: 18, color: '#0b57d0' }} />}
-                label="Cognitive Restructuring +3"
-                size="small"
-                sx={{
-                  backgroundColor: 'transparent',
-                  border: '1px solid #c4c7c5',
-                  borderRadius: '8px',
-                  '& .MuiChip-icon': { color: '#0b57d0' },
-                  '& .MuiChip-label': { 
-                    fontSize: '12px',
-                    fontWeight: 500,
-                    color: '#0b57d0',
-                  },
-                }}
-              />
-              <Chip
-                icon={<Check sx={{ fontSize: 18, color: '#128937' }} />}
-                label="Strong Adherence"
-                size="small"
-                sx={{
-                  backgroundColor: '#ddf8d8',
-                  border: '1px solid #beefbb',
-                  borderRadius: '8px',
-                  '& .MuiChip-icon': { color: '#128937' },
-                  '& .MuiChip-label': { 
-                    fontSize: '12px',
-                    fontWeight: 500,
-                    color: '#128937',
-                  },
-                }}
-              />
+              {/* Dynamic technique chips from analysis */}
+              {sessionMetrics.techniques_detected.length > 0 ? (
+                sessionMetrics.techniques_detected.slice(0, 3).map((technique, idx) => (
+                  <Chip
+                    key={idx}
+                    icon={<Check sx={{ fontSize: 18, color: '#0b57d0' }} />}
+                    label={technique}
+                    size="small"
+                    sx={{
+                      backgroundColor: 'transparent',
+                      border: '1px solid #c4c7c5',
+                      borderRadius: '8px',
+                      '& .MuiChip-icon': { color: '#0b57d0' },
+                      '& .MuiChip-label': {
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        color: '#0b57d0',
+                      },
+                    }}
+                  />
+                ))
+              ) : (
+                <Chip
+                  label="Awaiting analysis..."
+                  size="small"
+                  sx={{
+                    backgroundColor: 'transparent',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '8px',
+                    '& .MuiChip-label': {
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      color: '#9e9e9e',
+                      fontStyle: 'italic',
+                    },
+                  }}
+                />
+              )}
+              {/* Dynamic effectiveness chip from pathway analysis */}
+              {(() => {
+                const eff = pathwayIndicators.current_approach_effectiveness;
+                const effConfig = {
+                  effective: { bg: '#ddf8d8', border: '#beefbb', color: '#128937', label: 'Effective' },
+                  struggling: { bg: '#fef3cd', border: '#fde68a', color: '#92400e', label: 'Struggling' },
+                  ineffective: { bg: '#fee2e2', border: '#fca5a5', color: '#b91c1c', label: 'Ineffective' },
+                  unknown: { bg: '#f3f4f6', border: '#e0e0e0', color: '#9e9e9e', label: 'Assessing...' },
+                }[eff] || { bg: '#f3f4f6', border: '#e0e0e0', color: '#9e9e9e', label: 'Assessing...' };
+                return (
+                  <Chip
+                    icon={eff !== 'unknown' ? <Check sx={{ fontSize: 18, color: effConfig.color }} /> : undefined}
+                    label={effConfig.label}
+                    size="small"
+                    sx={{
+                      backgroundColor: effConfig.bg,
+                      border: `1px solid ${effConfig.border}`,
+                      borderRadius: '8px',
+                      '& .MuiChip-icon': { color: effConfig.color },
+                      '& .MuiChip-label': {
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        color: effConfig.color,
+                      },
+                    }}
+                  />
+                );
+              })()}
             </Box>
           </Box>
 
@@ -1462,14 +1560,14 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
             '& > *:not(:first-of-type)': { flex: 1 },
           }}>
             {/* Session ID / Transcript Button / Test Buttons */}
-            <Box sx={{ 
+            <Box sx={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              px: 1, 
-              py: 2, 
+              px: 1,
+              py: 1,
               borderRight: '1px solid #f0f4f9',
-              minWidth: isRecording ? 100 : 200,
+              minWidth: isRecording ? 100 : 180,
               flexShrink: 0,
             }}>
               {isRecording ? (
@@ -1528,9 +1626,9 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
                   )}
                 </Button>
               ) : !isTestMode ? (
-                <Box sx={{ 
+                <Box sx={{
                   display: 'flex',
-                  gap: 1,
+                  gap: 0.5,
                   flexDirection: 'column',
                   alignItems: 'center',
                 }}>
@@ -1539,7 +1637,7 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
                     size="small"
                     startIcon={<VolumeUp />}
                     onClick={loadExampleAudio}
-                    sx={{ 
+                    sx={{
                       borderColor: '#6366f1',
                       color: '#6366f1',
                       '&:hover': {
@@ -1547,20 +1645,20 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
                         backgroundColor: 'rgba(99, 102, 241, 0.04)',
                       },
                       fontWeight: 600,
-                      borderRadius: '16px',
-                      px: 2,
-                      py: 0.5,
-                      fontSize: '12px',
+                      borderRadius: '12px',
+                      px: 1.5,
+                      py: 0.25,
+                      fontSize: '11px',
                       minWidth: 'auto',
                     }}
                   >
-                    Load Example Audio
+                    Example Audio
                   </Button>
                   <Button
                     variant="outlined"
                     size="small"
                     onClick={loadTestTranscript}
-                    sx={{ 
+                    sx={{
                       borderColor: '#0b57d0',
                       color: '#0b57d0',
                       '&:hover': {
@@ -1568,14 +1666,14 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
                         backgroundColor: 'rgba(11, 87, 208, 0.04)',
                       },
                       fontWeight: 600,
-                      borderRadius: '16px',
-                      px: 2,
-                      py: 0.5,
-                      fontSize: '12px',
+                      borderRadius: '12px',
+                      px: 1.5,
+                      py: 0.25,
+                      fontSize: '11px',
                       minWidth: 'auto',
                     }}
                   >
-                    Load Test Transcript
+                    Test Transcript
                   </Button>
                   <Button
                     variant="outlined"
@@ -1590,14 +1688,14 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
                         backgroundColor: 'rgba(13, 148, 136, 0.04)',
                       },
                       fontWeight: 600,
-                      borderRadius: '16px',
-                      px: 2,
-                      py: 0.5,
-                      fontSize: '12px',
+                      borderRadius: '12px',
+                      px: 1.5,
+                      py: 0.25,
+                      fontSize: '11px',
                       minWidth: 'auto',
                     }}
                   >
-                    Upload Transcript
+                    Upload Script
                   </Button>
                   <input
                     type="file"
@@ -1618,29 +1716,32 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
             <Box sx={{
               display: 'flex',
               alignItems: 'center',
-              gap: 1.5,
-              px: 2,
-              py: 1.5,
+              gap: 1,
+              px: 1.5,
+              py: 0.75,
               borderRight: '1px solid #f0f4f9',
+              minWidth: 90,
+              overflow: 'hidden',
             }}>
               <Box sx={{
-                width: 14,
-                height: 14,
+                width: 12,
+                height: 12,
                 borderRadius: '50%',
                 backgroundColor: getEmotionalStateColor(sessionMetrics.emotional_state),
                 flexShrink: 0,
               }} />
               <Box sx={{ minWidth: 0 }}>
                 <Typography sx={{
-                  fontSize: '10px',
+                  fontSize: '9px',
                   color: '#5f6368',
                   textTransform: 'uppercase',
                   letterSpacing: '0.3px',
                   lineHeight: 1.2,
+                  whiteSpace: 'nowrap',
                 }}>
                   Emotional
                 </Typography>
-                <Typography sx={{ fontWeight: 600, fontSize: '13px', color: '#1f1f1f', textTransform: 'capitalize', lineHeight: 1.3 }}>
+                <Typography sx={{ fontWeight: 600, fontSize: '12px', color: '#1f1f1f', textTransform: 'capitalize', lineHeight: 1.3, whiteSpace: 'nowrap' }}>
                   {sessionMetrics.emotional_state}
                 </Typography>
               </Box>
@@ -1650,29 +1751,32 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
             <Box sx={{
               display: 'flex',
               alignItems: 'center',
-              gap: 1.5,
-              px: 2,
-              py: 1.5,
+              gap: 1,
+              px: 1.5,
+              py: 0.75,
               borderRight: '1px solid #f0f4f9',
+              minWidth: 90,
+              overflow: 'hidden',
             }}>
               <Box sx={{
-                width: 14,
-                height: 14,
+                width: 12,
+                height: 12,
                 borderRadius: '50%',
                 backgroundColor: '#0b57d0',
                 flexShrink: 0,
               }} />
               <Box sx={{ minWidth: 0 }}>
                 <Typography sx={{
-                  fontSize: '10px',
+                  fontSize: '9px',
                   color: '#5f6368',
                   textTransform: 'uppercase',
                   letterSpacing: '0.3px',
                   lineHeight: 1.2,
+                  whiteSpace: 'nowrap',
                 }}>
                   Engagement
                 </Typography>
-                <Typography sx={{ fontWeight: 600, fontSize: '13px', color: '#1f1f1f', lineHeight: 1.3 }}>
+                <Typography sx={{ fontWeight: 600, fontSize: '12px', color: '#1f1f1f', lineHeight: 1.3, whiteSpace: 'nowrap' }}>
                   {sessionMetrics.engagement_level === 0 ? '—' : `${Math.round(sessionMetrics.engagement_level * 100)}%`}
                 </Typography>
               </Box>
@@ -1682,29 +1786,32 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
             <Box sx={{
               display: 'flex',
               alignItems: 'center',
-              gap: 1.5,
-              px: 2,
-              py: 1.5,
+              gap: 1,
+              px: 1.5,
+              py: 0.75,
               borderRight: '1px solid #f0f4f9',
+              minWidth: 90,
+              overflow: 'hidden',
             }}>
               <Box sx={{
-                width: 14,
-                height: 14,
+                width: 12,
+                height: 12,
                 borderRadius: '50%',
                 backgroundColor: '#9254ea',
                 flexShrink: 0,
               }} />
               <Box sx={{ minWidth: 0 }}>
                 <Typography sx={{
-                  fontSize: '10px',
+                  fontSize: '9px',
                   color: '#5f6368',
                   textTransform: 'uppercase',
                   letterSpacing: '0.3px',
                   lineHeight: 1.2,
+                  whiteSpace: 'nowrap',
                 }}>
                   Alliance
                 </Typography>
-                <Typography sx={{ fontWeight: 600, fontSize: '13px', color: '#1f1f1f', textTransform: 'capitalize', lineHeight: 1.3 }}>
+                <Typography sx={{ fontWeight: 600, fontSize: '12px', color: '#1f1f1f', textTransform: 'capitalize', lineHeight: 1.3, whiteSpace: 'nowrap' }}>
                   {sessionMetrics.therapeutic_alliance}
                 </Typography>
               </Box>
@@ -1714,29 +1821,32 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
             <Box sx={{
               display: 'flex',
               alignItems: 'center',
-              gap: 1.5,
-              px: 2,
-              py: 1.5,
+              gap: 1,
+              px: 1.5,
+              py: 0.75,
               borderRight: '1px solid #f0f4f9',
+              minWidth: 90,
+              overflow: 'hidden',
             }}>
               <Box sx={{
-                width: 14,
-                height: 14,
+                width: 12,
+                height: 12,
                 borderRadius: '50%',
                 backgroundColor: getArousalColor(sessionMetrics.arousal_level),
                 flexShrink: 0,
               }} />
               <Box sx={{ minWidth: 0 }}>
                 <Typography sx={{
-                  fontSize: '10px',
+                  fontSize: '9px',
                   color: '#5f6368',
                   textTransform: 'uppercase',
                   letterSpacing: '0.3px',
                   lineHeight: 1.2,
+                  whiteSpace: 'nowrap',
                 }}>
                   Arousal
                 </Typography>
-                <Typography sx={{ fontWeight: 600, fontSize: '13px', color: '#1f1f1f', textTransform: 'capitalize', lineHeight: 1.3 }}>
+                <Typography sx={{ fontWeight: 600, fontSize: '12px', color: '#1f1f1f', textTransform: 'capitalize', lineHeight: 1.3, whiteSpace: 'nowrap' }}>
                   {sessionMetrics.arousal_level}
                 </Typography>
               </Box>
@@ -1746,15 +1856,17 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
             <Box sx={{
               display: 'flex',
               alignItems: 'center',
-              gap: 1.5,
-              px: 2,
-              py: 1.5,
+              gap: 1,
+              px: 1.5,
+              py: 0.75,
               borderRight: '1px solid #f0f4f9',
+              minWidth: 110,
+              overflow: 'hidden',
             }}>
-              <Check sx={{ fontSize: 18, color: '#128937' }} />
+              <Check sx={{ fontSize: 16, color: sessionMetrics.phase_appropriate ? '#128937' : '#f59e0b' }} />
               <Box sx={{ minWidth: 0 }}>
                 <Typography sx={{
-                  fontSize: '10px',
+                  fontSize: '9px',
                   color: '#5f6368',
                   textTransform: 'uppercase',
                   letterSpacing: '0.3px',
@@ -1762,22 +1874,22 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
                 }}>
                   {determineTherapyPhase(sessionDuration)}
                 </Typography>
-                <Typography sx={{ fontWeight: 600, fontSize: '13px', color: '#1f1f1f', lineHeight: 1.3 }}>
-                  Phase-appropriate
+                <Typography sx={{ fontWeight: 600, fontSize: '12px', color: sessionMetrics.phase_appropriate ? '#128937' : '#f59e0b', lineHeight: 1.3, whiteSpace: 'nowrap' }}>
+                  {sessionMetrics.phase_appropriate ? 'Phase-appropriate' : 'Assessing...'}
                 </Typography>
               </Box>
             </Box>
 
             {/* Timer and Controls */}
-            <Box sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
+            <Box sx={{
+              display: 'flex',
+              alignItems: 'center',
               justifyContent: 'flex-end',
-              gap: 2, 
-              px: 3, 
-              py: 2,
+              gap: 1.5,
+              px: 2,
+              py: 0.75,
             }}>
-              <Typography variant="h6" sx={{ fontWeight: 400, fontSize: '28px', color: '#444746' }}>
+              <Typography variant="h6" sx={{ fontWeight: 400, fontSize: '22px', color: '#444746' }}>
                 {formatDuration(sessionDuration)}
               </Typography>
               {!isRecording ? (

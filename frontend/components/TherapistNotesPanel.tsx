@@ -24,7 +24,7 @@ type SaveStatus = 'not_saved' | 'saving' | 'saved';
 
 const TherapistNotesPanel: React.FC<TherapistNotesPanelProps> = ({ sessionInstanceId }) => {
   const [notes, setNotes] = useState('');
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('not_saved');
   const [isDirty, setIsDirty] = useState(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);

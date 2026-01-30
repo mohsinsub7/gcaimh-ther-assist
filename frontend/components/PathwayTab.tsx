@@ -78,20 +78,20 @@ const PathwayTab: React.FC<PathwayTabProps> = ({ onCitationClick, currentGuidanc
     <Box sx={{
       display: 'flex',
       flexDirection: 'column',
-      gap: 4,
-      pb: 4,
+      gap: 3,
+      pb: 2,
       position: 'relative',
     }}>
       {/* Main pathway content — dynamic rationale */}
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {rationaleLines.map((line: string, index: number) => (
           <Typography
             key={index}
             variant="h5"
             sx={{
-              fontSize: '28px',
+              fontSize: '22px',
               fontWeight: 400,
-              lineHeight: '36px',
+              lineHeight: '30px',
               color: '#1f1f1f',
             }}
           >
@@ -148,7 +148,7 @@ const PathwayTab: React.FC<PathwayTabProps> = ({ onCitationClick, currentGuidanc
       )}
 
       {/* Techniques and Citations Row */}
-      <Box sx={{ display: 'flex', gap: 6, mt: 2 }}>
+      <Box sx={{ display: 'flex', gap: 4, mt: 1 }}>
         {/* Techniques Detected */}
         <Box sx={{ flex: 1 }}>
           <Typography variant="body2" sx={{

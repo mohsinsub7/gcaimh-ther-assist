@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Box, Typography, IconButton, Tooltip, Badge } from '@mui/material';
-import { Lock, LockOpen, Delete } from '@mui/icons-material';
+import { Lock, LockOpen, Delete, Download } from '@mui/icons-material';
 
 export interface ActivityLogEntry {
   id: string;
@@ -43,6 +43,26 @@ const ActivityLog: React.FC<ActivityLogProps> = ({ entries, onClear }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  const handleDownloadLog = () => {
+    if (entries.length === 0) return;
+    const exportData = entries.map(entry => ({
+      timestamp: entry.timestamp,
+      model: entry.model,
+      analysisType: entry.analysisType,
+      phase: entry.phase,
+      summary: entry.summary,
+      ...(entry.details || {}),
+    }));
+    const content = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([content], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `llm-activity-log-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   useEffect(() => {
     if (autoScroll && scrollRef.current) {
@@ -116,7 +136,7 @@ const ActivityLog: React.FC<ActivityLogProps> = ({ entries, onClear }) => {
             badgeContent={entries.length}
             color="primary"
             max={99}
-            sx={{ '& .MuiBadge-badge': { fontSize: '9px', height: 16, minWidth: 16 } }}
+            sx={{ ml: 1.5, '& .MuiBadge-badge': { fontSize: '9px', height: 16, minWidth: 16 } }}
           />
         </Box>
         <Box sx={{ display: 'flex', gap: 0.25 }}>
@@ -126,6 +146,11 @@ const ActivityLog: React.FC<ActivityLogProps> = ({ entries, onClear }) => {
                 ? <Lock sx={{ fontSize: 14, color: '#66bb6a' }} />
                 : <LockOpen sx={{ fontSize: 14, color: '#78909c' }} />
               }
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Download log (JSON)" arrow>
+            <IconButton size="small" onClick={handleDownloadLog} disabled={entries.length === 0} sx={{ p: 0.5 }}>
+              <Download sx={{ fontSize: 14, color: entries.length > 0 ? '#42a5f5' : '#555' }} />
             </IconButton>
           </Tooltip>
           <Tooltip title="Clear log" arrow>
