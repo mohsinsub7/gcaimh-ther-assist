@@ -374,6 +374,8 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
   } = useAudioStreamingWebSocketTher({
     authToken,
     onTranscript: (newTranscript: any) => {
+      if (isPausedRef.current) return; // Freeze display when paused
+
       if (newTranscript.is_interim) {
         setTranscript(prev => {
           const newEntry = {
@@ -409,6 +411,8 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
       }
     },
     onAnalysis: (analysis: any) => {
+      if (isPausedRef.current) return; // Freeze display when paused
+
       // Analysis from Gemini Live API (via WebSocket) — handles both alerts and metrics
       console.log('[Session] WebSocket analysis received:', analysis);
 
@@ -501,6 +505,8 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
   const { analyzeSegment, generateSessionSummary } = useTherapyAnalysis({
     authToken,
     onAnalysis: (analysis) => {
+      if (isPausedRef.current) return; // Freeze display when paused
+
       const analysisType = (analysis as any).analysis_type;
       const isRealtime = analysisType === 'realtime';
       const jobId = (analysis as any).job_id;
