@@ -174,6 +174,10 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
   // Core session state
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const isPausedRef = useRef(isPaused);
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+  }, [isPaused]);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [sessionType, setSessionType] = useState<'microphone' | 'test' | 'audio' | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(null);
