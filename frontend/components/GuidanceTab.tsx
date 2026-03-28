@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import React from 'react';
-import { Box, Paper, Typography, LinearProgress, Tooltip } from '@mui/material';
-import { HealthAndSafety, NaturePeople, Category, Exposure } from '@mui/icons-material';
+import React, { useState } from 'react';
+import { Box, Paper, Typography, LinearProgress, Tooltip, Collapse } from '@mui/material';
+import { HealthAndSafety, NaturePeople, Category, Exposure, Psychology, ExpandMore, ExpandLess, History } from '@mui/icons-material';
 
 interface GuidanceTabProps {
   currentGuidance: {
@@ -44,7 +44,8 @@ interface GuidanceTabProps {
   };
 }
 
-const GuidanceTab: React.FC<GuidanceTabProps> = ({ currentGuidance, onActionClick, sessionMetrics }) => {
+const GuidanceTab: React.FC<GuidanceTabProps> = ({ currentGuidance, onActionClick, alerts, sessionMetrics }) => {
+  const [historyExpanded, setHistoryExpanded] = useState(false);
   const getEmotionalStateColor = (state: string) => {
     switch (state) {
       case 'calm': return '#128937';
@@ -85,9 +86,50 @@ const GuidanceTab: React.FC<GuidanceTabProps> = ({ currentGuidance, onActionClic
     }
   };
 
-  const ActionCard = ({ action, isContraindication = false }: { 
-    action: any; 
-    isContraindication?: boolean; 
+  // Parse guidance content into formatted bullet points
+  const renderInsightBullets = (content: string) => {
+    if (!content) return null;
+
+    // Detect placeholder text
+    const placeholders = ['Listening...', 'Start a session', 'No guidance available', 'Waiting for analysis'];
+    if (placeholders.some(p => content.includes(p))) {
+      return (
+        <Typography variant="body1" sx={{ fontSize: '14px', color: '#5f6368', fontStyle: 'italic' }}>
+          {content}
+        </Typography>
+      );
+    }
+
+    // Split on newlines with bullet markers, or on sentence boundaries
+    const lines = content.includes('\n')
+      ? content.split('\n').map(l => l.replace(/^[-*]\s*/, '').trim()).filter(l => l.length > 0)
+      : content.split(/(?<=\.)\s+/).filter(l => l.trim().length > 3);
+
+    if (lines.length <= 1) {
+      return (
+        <Typography variant="body1" sx={{ fontSize: '14px', color: '#1f1f1f', lineHeight: 1.6 }}>
+          {content}
+        </Typography>
+      );
+    }
+
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+        {lines.map((line, idx) => (
+          <Box key={idx} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+            <Box sx={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#0b57d0', mt: '7px', flexShrink: 0 }} />
+            <Typography variant="body1" sx={{ fontSize: '14px', color: '#1f1f1f', lineHeight: 1.6 }}>
+              {line}
+            </Typography>
+          </Box>
+        ))}
+      </Box>
+    );
+  };
+
+  const ActionCard = ({ action, isContraindication = false }: {
+    action: any;
+    isContraindication?: boolean;
   }) => (
     <Paper
       onClick={() => onActionClick(action, isContraindication)}
@@ -249,70 +291,118 @@ const GuidanceTab: React.FC<GuidanceTabProps> = ({ currentGuidance, onActionClic
         </Box>
       )}
 
+      {/* AI Analysis / Insights */}
       <Box sx={{
         p: 2,
-        border: '1px solid #c4c7c5',
+        border: '1px solid #c0d4f5',
         borderRadius: '12px',
-        backgroundColor: '#f8f9fa',
+        backgroundColor: '#e8f0fe',
       }}>
-        <Typography
-          variant="h6"
-          sx={{
-            fontSize: '16px',
-            fontWeight: 400,
-            lineHeight: '24px',
-            color: '#1f1f1f',
-            whiteSpace: 'pre-line',
-            maxHeight: '120px',
-            overflow: 'auto',
-          }}
-        >
-          {currentGuidance.content}
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+          <Psychology sx={{ fontSize: 20, color: '#0b57d0' }} />
+          <Typography sx={{ fontSize: '11px', fontWeight: 700, color: '#0b57d0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            AI Analysis / Insights
+          </Typography>
+        </Box>
+        {renderInsightBullets(currentGuidance.content)}
       </Box>
 
-      {/* Action Cards */}
-      <Box sx={{ display: 'flex', gap: 3 }}>
-        {/* Immediate Actions */}
-        <Box sx={{ flex: 1 }}>
-          <Typography variant="body2" sx={{ 
-            fontSize: '14px', 
-            fontWeight: 600, 
-            color: '#444746',
-            mb: 2,
-            letterSpacing: '0.5px',
-          }}>
-            IMMEDIATE ACTIONS
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            {currentGuidance.immediateActions.map((action, index) => (
-              <Box key={index} sx={{ flex: 1 }}>
-                <ActionCard action={action} />
-              </Box>
-            ))}
+      {/* Recommendations + Contraindications (stacked vertically) */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        {/* Recommendations (formerly Immediate Actions) */}
+        {currentGuidance.immediateActions.length > 0 && (
+          <Box>
+            <Typography variant="body2" sx={{
+              fontSize: '14px',
+              fontWeight: 600,
+              color: '#444746',
+              mb: 2,
+              letterSpacing: '0.5px',
+            }}>
+              RECOMMENDATIONS
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              {currentGuidance.immediateActions.map((action, index) => (
+                <Box key={index} sx={{ flex: 1 }}>
+                  <ActionCard action={action} />
+                </Box>
+              ))}
+            </Box>
           </Box>
-        </Box>
+        )}
 
         {/* Contraindications */}
-        <Box sx={{ flex: 1 }}>
-          <Typography variant="body2" sx={{ 
-            fontSize: '14px', 
-            fontWeight: 600, 
-            color: '#444746',
-            mb: 2,
-            letterSpacing: '0.5px',
-          }}>
-            CONTRAINDICATIONS
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            {currentGuidance.contraindications.map((action, index) => (
-              <Box key={index} sx={{ flex: 1 }}>
-                <ActionCard action={action} isContraindication />
-              </Box>
-            ))}
+        {currentGuidance.contraindications.length > 0 && (
+          <Box>
+            <Typography variant="body2" sx={{
+              fontSize: '14px',
+              fontWeight: 600,
+              color: '#444746',
+              mb: 2,
+              letterSpacing: '0.5px',
+            }}>
+              CONTRAINDICATIONS
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              {currentGuidance.contraindications.map((action, index) => (
+                <Box key={index} sx={{ flex: 1 }}>
+                  <ActionCard action={action} isContraindication />
+                </Box>
+              ))}
+            </Box>
           </Box>
-        </Box>
+        )}
       </Box>
+
+      {/* Previous Recommendations Log */}
+      {alerts && alerts.length > 1 && (
+        <Box sx={{ mt: 1 }}>
+          <Box
+            onClick={() => setHistoryExpanded(!historyExpanded)}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              cursor: 'pointer',
+              py: 0.5,
+              userSelect: 'none',
+            }}
+          >
+            <History sx={{ fontSize: 16, color: '#5f6368' }} />
+            <Typography sx={{ fontSize: '11px', fontWeight: 600, color: '#5f6368', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+              Previous Recommendations ({alerts.length - 1})
+            </Typography>
+            {historyExpanded ? <ExpandLess sx={{ fontSize: 16, color: '#5f6368' }} /> : <ExpandMore sx={{ fontSize: 16, color: '#5f6368' }} />}
+          </Box>
+          <Collapse in={historyExpanded}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1, maxHeight: 300, overflowY: 'auto' }}>
+              {alerts.slice(1, 11).map((alert: any, idx: number) => (
+                <Box
+                  key={idx}
+                  sx={{
+                    p: 1.5,
+                    border: '1px solid #e9ebf1',
+                    borderRadius: '8px',
+                    backgroundColor: '#fafbfd',
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#1f1f1f' }}>
+                      {alert.title || 'Recommendation'}
+                    </Typography>
+                    <Typography sx={{ fontSize: '10px', color: '#9e9e9e' }}>
+                      {alert.category || ''}
+                    </Typography>
+                  </Box>
+                  <Typography sx={{ fontSize: '12px', color: '#444746', lineHeight: 1.5 }}>
+                    {alert.message || ''}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          </Collapse>
+        </Box>
+      )}
     </Box>
   );
 };
