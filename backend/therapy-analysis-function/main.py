@@ -1660,6 +1660,81 @@ def handle_pathway_guidance(request_json, headers):
         logging.exception(f"Error in handle_pathway_guidance: {str(e)}")
         return (jsonify({'error': f'Pathway guidance failed: {str(e)}'}), 500, headers)
 
+def _write_publish_draft_from_summary(parsed_summary: dict, session_context: dict, session_metrics: dict) -> None:
+    """Phase 5: Translate a session summary LLM response into a PublishDraft and write to Firestore.
+
+    The draft starts unpublished with all sections hidden — the therapist toggles which sections
+    to share with the client and clicks "Publish" in the client portal management UI.
+
+    Document path: /patients/{patient_id}/publishDrafts/{auto_id}
+
+    Args:
+        parsed_summary: the JSON object returned by the LLM (with key_moments, homework_assignments, etc.)
+        session_context: { patient_id, session_type, ... } passed by the frontend
+        session_metrics: { duration_minutes, detected_modality, ... } passed by the frontend
+
+    No return; emits warning log on failure.
+    """
+    if not db:
+        logging.warning("[PublishDraft] Firestore not available — skipping draft write")
+        return
+
+    patient_id = (session_context or {}).get('patient_id')
+    if not patient_id:
+        logging.info("[PublishDraft] No patient_id in session_context — skipping draft (likely a transient session)")
+        return
+
+    # ── Map LLM summary fields to PublishSummaryContent shape ──────────────
+    key_moments = [
+        m.get('description', '') for m in (parsed_summary.get('key_moments') or [])
+        if isinstance(m, dict) and m.get('description')
+    ]
+    homework_list = [
+        hw.get('task', '') for hw in (parsed_summary.get('homework_assignments') or [])
+        if isinstance(hw, dict) and hw.get('task')
+    ]
+    next_steps = list(parsed_summary.get('follow_up_recommendations') or [])
+    techniques = list(parsed_summary.get('techniques_used') or [])
+    # Derive themes from techniques + progress_indicators (no explicit 'themes' field in LLM output)
+    themes = techniques + list(parsed_summary.get('progress_indicators') or [])
+    risk_assessment = parsed_summary.get('risk_assessment') or {}
+    risk_label = risk_assessment.get('level') if isinstance(risk_assessment, dict) else None
+
+    # ── Build the PublishDraft document ─────────────────────────────────────
+    draft_data = {
+        'clientId': str(patient_id),
+        'sessionDate': parsed_summary.get('session_date') or datetime.utcnow().strftime('%Y-%m-%d'),
+        # Sections all start hidden — therapist toggles before publishing
+        'sections': {
+            'themes': False,
+            'keyMoments': False,
+            'homeworkList': False,
+            'riskLabel': False,
+            'nextSteps': False,
+        },
+        'published': False,
+        'content': {
+            'themes': themes,
+            'keyMoments': key_moments,
+            'homeworkList': homework_list,
+            'nextSteps': next_steps,
+            'clinicalNote': '',  # therapist authors this directly in the UI
+            **({'riskLabel': risk_label} if risk_label else {}),
+        },
+        'createdAt': firestore.SERVER_TIMESTAMP,
+        'source': 'auto-from-session-summary',  # provenance
+    }
+
+    coll_ref = db.collection('patients').document(str(patient_id)).collection('publishDrafts')
+    doc_ref = coll_ref.document()  # auto-id
+    doc_ref.set(draft_data)
+    logging.info(
+        f"[PublishDraft] Auto-wrote draft {doc_ref.id} to /patients/{patient_id}/publishDrafts "
+        f"({len(key_moments)} key moments, {len(homework_list)} homework, "
+        f"{len(next_steps)} next steps, risk={risk_label or 'none'})"
+    )
+
+
 def handle_session_summary(request_json, headers):
     """Generate session summary with key therapeutic moments"""
     try:
@@ -1752,6 +1827,14 @@ def handle_session_summary(request_json, headers):
 
                     parsed_response['citations'] = citations
                     logging.info(f"Added {len(citations)} citations to session summary response")
+
+            # Phase 5: auto-write a PublishDraft to the patient's portal subcollection.
+            # The therapist can then toggle which sections to show and click Publish.
+            # Best-effort: failure here is logged but doesn't break the summary response.
+            try:
+                _write_publish_draft_from_summary(parsed_response, session_context, session_metrics)
+            except Exception as draft_err:
+                logging.warning(f"[PublishDraft] Failed to auto-write draft (non-fatal): {draft_err}")
 
             return (jsonify({'summary': parsed_response}), 200, headers)
         else:
