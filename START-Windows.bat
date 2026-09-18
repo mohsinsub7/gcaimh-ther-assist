@@ -216,7 +216,10 @@ call gcloud config set billing/quota_project brk-prj-salvador-dura-bern-sbx >nul
 
 call gcloud auth application-default login --no-launch-browser --login-config="%LOGIN_CONFIG%"
 
+:: Honor an isolated gcloud profile (CLOUDSDK_CONFIG) so this launcher does not
+:: overwrite credentials used by other projects on the same machine
 set "ADC_FILE=%APPDATA%\gcloud\application_default_credentials.json"
+if defined CLOUDSDK_CONFIG set "ADC_FILE=%CLOUDSDK_CONFIG%\application_default_credentials.json"
 if not exist "%ADC_FILE%" (
     color 0C
     echo.
@@ -361,19 +364,26 @@ echo.
 :: ============================================================
 :: STEP 6: START ALL SERVICES
 :: ============================================================
+:: Each service writes its own log. Sharing one file made cmd refuse the
+:: redirect ("file is being used by another process") and skip the launch.
 echo  [6/7] Starting services...
 echo.
 
-start "TherAssist-Analysis" /B cmd /c "cd /d "%SCRIPT_DIR%backend\therapy-analysis-function" && set GOOGLE_APPLICATION_CREDENTIALS=%ADC_FILE% && set GOOGLE_CLOUD_PROJECT=brk-prj-salvador-dura-bern-sbx && set GOOGLE_CLOUD_LOCATION=us-central1 && venv\Scripts\python.exe -m functions_framework --target=therapy_analysis --port=8090 --debug >>"%ERROR_LOG%" 2>&1"
+start "TherAssist-Analysis" /B cmd /c "cd /d "%SCRIPT_DIR%backend\therapy-analysis-function" && set GOOGLE_APPLICATION_CREDENTIALS=%ADC_FILE% && set GOOGLE_CLOUD_PROJECT=brk-prj-salvador-dura-bern-sbx && set GOOGLE_CLOUD_LOCATION=us-central1 && venv\Scripts\python.exe -m functions_framework --target=therapy_analysis --port=8090 >"%SCRIPT_DIR%error-log-analysis.txt" 2>&1"
 echo        therapy-analysis (8090)...started
 
-start "TherAssist-Storage" /B cmd /c "cd /d "%SCRIPT_DIR%backend\storage-access-function" && set GOOGLE_APPLICATION_CREDENTIALS=%ADC_FILE% && set GOOGLE_CLOUD_PROJECT=brk-prj-salvador-dura-bern-sbx && venv\Scripts\python.exe -m functions_framework --target=storage_access --port=8081 >>"%ERROR_LOG%" 2>&1"
+start "TherAssist-Storage" /B cmd /c "cd /d "%SCRIPT_DIR%backend\storage-access-function" && set GOOGLE_APPLICATION_CREDENTIALS=%ADC_FILE% && set GOOGLE_CLOUD_PROJECT=brk-prj-salvador-dura-bern-sbx && venv\Scripts\python.exe -m functions_framework --target=storage_access --port=8081 >"%SCRIPT_DIR%error-log-storage.txt" 2>&1"
 echo        storage-access (8081)...  started
 
-start "TherAssist-Streaming" /B cmd /c "cd /d "%SCRIPT_DIR%backend\streaming-transcription-service" && set GOOGLE_APPLICATION_CREDENTIALS=%ADC_FILE% && set GOOGLE_CLOUD_PROJECT=brk-prj-salvador-dura-bern-sbx && set GOOGLE_CLOUD_LOCATION=us-central1 && set PORT=8082 && venv\Scripts\python.exe main.py >>"%ERROR_LOG%" 2>&1"
+start "TherAssist-Streaming" /B cmd /c "cd /d "%SCRIPT_DIR%backend\streaming-transcription-service" && set GOOGLE_APPLICATION_CREDENTIALS=%ADC_FILE% && set GOOGLE_CLOUD_PROJECT=brk-prj-salvador-dura-bern-sbx && set GOOGLE_CLOUD_LOCATION=us-central1 && set PORT=8082 && venv\Scripts\python.exe main.py >"%SCRIPT_DIR%error-log-streaming.txt" 2>&1"
 echo        streaming-stt (8082)...   started
 
-start "TherAssist-Frontend" /B cmd /c "cd /d "%SCRIPT_DIR%frontend" && npx vite --port 3000 >>"%ERROR_LOG%" 2>&1"
+:: Vite must run from the real folder: under a subst drive it resolves the
+:: real path and then fails to load /index.tsx. THERASSIST_REAL_DIR is set by
+:: START-Windows-Isolated.bat; otherwise this is just SCRIPT_DIR.
+set "FRONTEND_ROOT=%SCRIPT_DIR%"
+if defined THERASSIST_REAL_DIR set "FRONTEND_ROOT=%THERASSIST_REAL_DIR%"
+start "TherAssist-Frontend" /B cmd /c "cd /d "%FRONTEND_ROOT%frontend" && npx vite --port 3000 >"%SCRIPT_DIR%error-log-frontend.txt" 2>&1"
 echo        frontend (3000)...        started
 
 echo.
