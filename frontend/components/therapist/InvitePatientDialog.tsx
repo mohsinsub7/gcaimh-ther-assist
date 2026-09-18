@@ -170,7 +170,7 @@ export const InvitePatientDialog: React.FC<InvitePatientDialogProps> = ({
                   Hi {patientName.split(' ')[0]},
                 </Typography>
                 <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary' }}>
-                  Your therapist {therapistEmail.split('@')[0]} has invited you to your personal mental wellness portal — a space to access your homework, journal, and track your progress between sessions.
+                  Your therapist has invited you to your personal mental wellness portal — a space to access your homework, journal, and track your progress between sessions.
                 </Typography>
                 <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary', fontStyle: 'italic' }}>
                   [Sign in with a single click — no password needed]

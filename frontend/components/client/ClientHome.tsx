@@ -91,8 +91,8 @@ export const ClientHome: React.FC<ClientHomeProps> = ({
   }
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1400, mx: 'auto' }}>
-      {/* Header */}
+    <Box sx={{ p: { xs: 2, md: 3 }, pt: { xs: 10, md: 10 }, maxWidth: 1400, mx: 'auto' }}>
+      {/* Header — top padding clears the app's fixed back button (top-left, 16px inset) */}
       <Typography variant="h3" sx={{ fontWeight: 600, mb: 1, fontSize: { xs: '1.75rem', sm: '2.5rem', md: '3rem' } }}>
         Welcome back!
       </Typography>
