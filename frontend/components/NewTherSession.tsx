@@ -287,7 +287,9 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
   });
   
   // Analysis tracking
-  const [wordsSinceLastAnalysis, setWordsSinceLastAnalysis] = useState(0);
+  // A ref, not state: it is never rendered, and the analysis trigger must not live
+  // inside a state updater (StrictMode double-invokes updaters → duplicate requests).
+  const wordsSinceLastAnalysisRef = useRef(0);
   const [hasReceivedComprehensiveAnalysis, setHasReceivedComprehensiveAnalysis] = useState(false);
   
   // Analysis job ID tracking - counter to relate realtime and comprehensive results
@@ -852,35 +854,34 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
     // Count words in the new entry
     const newWords = lastEntry.text.split(' ').filter(word => word.trim()).length;
 
-    setWordsSinceLastAnalysis(prev => {
-      const updatedWordCount = prev + newWords;
+    const updatedWordCount = wordsSinceLastAnalysisRef.current + newWords;
 
-      // Trigger analysis every 8 words for responsive real-time guidance
-      const WORDS_PER_ANALYSIS = 8;
-      const TRANSCRIPT_WINDOW_MINUTES = 5;
+    // Trigger analysis every 8 words for responsive real-time guidance
+    const WORDS_PER_ANALYSIS = 8;
+    const TRANSCRIPT_WINDOW_MINUTES = 5;
 
-      if (updatedWordCount >= WORDS_PER_ANALYSIS) {
-        // Get last 5 minutes of transcript
-        const fiveMinutesAgo = new Date(Date.now() - TRANSCRIPT_WINDOW_MINUTES * 60 * 1000);
-        const recentTranscript = transcript
-          .filter(t => !t.is_interim && new Date(t.timestamp) > fiveMinutesAgo)
-          .map(t => ({
-            speaker: t.speaker || 'conversation',
-            text: t.text,
-            timestamp: t.timestamp
-          }));
+    if (updatedWordCount < WORDS_PER_ANALYSIS) {
+      wordsSinceLastAnalysisRef.current = updatedWordCount;
+      return;
+    }
 
-        if (recentTranscript.length > 0) {
-          firstAnalysisFiredRef.current = true;
-          triggerPairedAnalysis(recentTranscript, `Auto-analysis (${updatedWordCount} words)`);
-        }
+    // Reset word count
+    wordsSinceLastAnalysisRef.current = 0;
 
-        // Reset word count
-        return 0;
-      }
+    // Get last 5 minutes of transcript
+    const fiveMinutesAgo = new Date(Date.now() - TRANSCRIPT_WINDOW_MINUTES * 60 * 1000);
+    const recentTranscript = transcript
+      .filter(t => !t.is_interim && new Date(t.timestamp) > fiveMinutesAgo)
+      .map(t => ({
+        speaker: t.speaker || 'conversation',
+        text: t.text,
+        timestamp: t.timestamp
+      }));
 
-      return updatedWordCount;
-    });
+    if (recentTranscript.length > 0) {
+      firstAnalysisFiredRef.current = true;
+      triggerPairedAnalysis(recentTranscript, `Auto-analysis (${updatedWordCount} words)`);
+    }
   }, [transcript, isRecording, triggerPairedAnalysis]);
 
   // Time-based fallback: fire first analysis after 20s if word threshold hasn't been met
@@ -1773,21 +1774,25 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
                 {onNavigateBack && (
                   <Button
+                    variant="outlined"
                     startIcon={<ArrowBack />}
                     onClick={onNavigateBack}
                     sx={{
                       color: '#0b57d0',
+                      borderColor: '#0b57d0',
                       textTransform: 'none',
                       fontSize: '14px',
-                      fontWeight: 500,
-                      minWidth: 'auto',
-                      px: 1,
-                      py: 0.5,
+                      fontWeight: 600,
+                      borderRadius: 2,
+                      px: 2,
+                      py: 0.75,
                       '&:hover': {
-                        backgroundColor: 'rgba(11, 87, 208, 0.04)',
+                        borderColor: '#00639b',
+                        backgroundColor: '#e8f0fe',
                       },
                     }}
                   >
+                    Exit Session
                   </Button>
                 )}
                 <Typography variant="h6" sx={{
