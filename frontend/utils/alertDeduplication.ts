@@ -39,9 +39,11 @@ const DEFAULT_CONFIG: DeduplicationConfig = {
  * (intersection over union of word sets)
  */
 function calculateSimilarity(text1: string, text2: string): number {
-  // Normalize text: lowercase, remove punctuation, split into words
-  const normalize = (text: string) => 
-    text.toLowerCase()
+  // Normalize text: lowercase, remove punctuation, split into words.
+  // Alerts come from LLM output, and a truncated response (MAX_TOKENS) can
+  // arrive with only a title — so title/message may be undefined at runtime.
+  const normalize = (text: string) =>
+    (text || '').toLowerCase()
       .replace(/[^\w\s]/g, ' ')
       .split(/\s+/)
       .filter(word => word.length > 2); // Remove short words
@@ -61,8 +63,8 @@ function calculateSimilarity(text1: string, text2: string): number {
  * Extract key phrases/themes from alert text for semantic comparison
  */
 function extractKeyPhrases(text: string): Set<string> {
-  const normalizedText = text.toLowerCase();
-  
+  const normalizedText = (text || '').toLowerCase();
+
   // Common therapy/clinical phrases that indicate similar content
   const keyPhrases = new Set<string>();
   
