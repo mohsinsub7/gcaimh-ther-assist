@@ -1611,7 +1611,12 @@ def handle_pathway_guidance(request_json, headers):
 
         response_text = ""
         if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
-            response_text = response.candidates[0].content.parts[0].text
+            # Join every text part: the first part is not guaranteed to be the text
+            # (tool/thought parts can lead), and reading parts[0] alone returned an
+            # empty result even though the model had answered.
+            response_text = "".join(
+                p.text for p in response.candidates[0].content.parts if getattr(p, "text", None)
+            )
 
         # Parse JSON response using robust extraction
         parsed_response = extract_json_from_text(response_text)
@@ -1798,7 +1803,12 @@ def handle_session_summary(request_json, headers):
 
         response_text = ""
         if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
-            response_text = response.candidates[0].content.parts[0].text
+            # Join every text part: the first part is not guaranteed to be the text
+            # (tool/thought parts can lead), and reading parts[0] alone returned an
+            # empty result even though the model had answered.
+            response_text = "".join(
+                p.text for p in response.candidates[0].content.parts if getattr(p, "text", None)
+            )
 
         # Parse JSON response using robust extraction
         parsed_response = extract_json_from_text(response_text)
