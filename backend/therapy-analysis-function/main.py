@@ -520,14 +520,13 @@ def _query_datastore(datastore_id: str, query_text: str, max_results: int = 3) -
             serving_config=serving_config,
             query=query_text,
             page_size=max_results,
+            # Snippets only. Extractive answers/segments are an enterprise-edition
+            # feature; these datastores are queried through their standard-edition
+            # default_search config, which rejects the whole request with a 400 —
+            # and the except below turned that into silently empty RAG context.
             content_search_spec=discoveryengine.SearchRequest.ContentSearchSpec(
                 snippet_spec=discoveryengine.SearchRequest.ContentSearchSpec.SnippetSpec(
                     return_snippet=True,
-                    max_snippet_count=3,
-                ),
-                extractive_content_spec=discoveryengine.SearchRequest.ContentSearchSpec.ExtractiveContentSpec(
-                    max_extractive_answer_count=2,
-                    max_extractive_segment_count=3,
                 ),
             ),
         )
@@ -1059,10 +1058,14 @@ def handle_realtime_analysis_with_retry(transcript_segment, transcript_text, pre
             )]
 
             # FAST configuration for real-time guidance
-            # Note: Realtime analysis uses no thinking config for maximum speed (Gemini 3 Flash)
+            # Thinking must be switched off explicitly: on gemini-2.5-flash, omitting
+            # thinking_config means DYNAMIC thinking, and thinking tokens count against
+            # max_output_tokens. Observed 979 of 1024 tokens spent thinking, leaving a
+            # truncated alert (title only) and 6-7s latency.
             config = types.GenerateContentConfig(
                 temperature=0.0,  # Deterministic for speed
                 max_output_tokens=1024,  # Tuned for concise alert JSON — ~750 words
+                thinking_config=types.ThinkingConfig(thinking_budget=0),
                 safety_settings=[
                     types.SafetySetting(
                         category="HARM_CATEGORY_HARASSMENT",
