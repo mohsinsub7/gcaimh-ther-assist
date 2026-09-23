@@ -584,7 +584,55 @@ After successful local setup:
 7. Configure real Firebase for production deployment
 8. Use Terraform for cloud deployment when ready
 
+## 🚀 QUICK START ON ANOTHER COMPUTER (Windows)
+
+The manual steps above are the long way. On Windows the launcher does all of it.
+
+### What you need before you start
+- A `@downstate.edu` Google account that has been granted access to the GCP
+  project `brk-prj-salvador-dura-bern-sbx` (ask Mohsin if you are not sure).
+- The repository, on the branch that contains the launcher fixes. `git clone`
+  is enough — the launcher, `gcloud-login-config.json` and every `.env` file
+  are in the repo.
+- Python 3.10+, Node.js LTS and the Google Cloud CLI. If any is missing the
+  launcher installs it with `winget` and asks you to run it again.
+- Drive letter `T:` free. The launcher maps it to the repo because Windows'
+  260-character path limit breaks one of the Python packages under long
+  folder paths (OneDrive paths are the usual culprit).
+
+### Steps
+1. Double-click `START-Windows-Isolated.bat` (not `START-Windows.bat`).
+   The isolated version keeps the SUNY sign-in in its own gcloud profile
+   (`%USERPROFILE%\.gcloud-therassist`), so it never overwrites Google Cloud
+   credentials you use for anything else.
+2. When a sign-in link appears, open it in a browser, sign in with your
+   `@downstate.edu` account, and paste the verification code **into the
+   launcher window** (never into chat or email — it is a one-time secret).
+3. First run takes 5-10 minutes while it creates the Python environments and
+   installs dependencies. Later runs take about 30 seconds.
+4. Chrome opens at `http://localhost:3000`. The pilot access password is in
+   `frontend/components/PasswordGate.tsx`. It is remembered per browser tab.
+5. Leave the launcher window open while you use the app; closing it stops
+   the services.
+
+### If something fails
+- Each service writes its own log next to the launcher:
+  `error-log-analysis.txt`, `error-log-storage.txt`,
+  `error-log-streaming.txt`, `error-log-frontend.txt`. Read the one for the
+  service that did not come up.
+- "OAuth token expired" in `error-log-analysis.txt`: the SUNY sign-in has
+  lapsed. Close the launcher and run it again; it signs in every start.
+- "Could not map drive T:": something else uses `T:`. Free it, or run the
+  plain `START-Windows.bat` from a short path such as `C:\therassist`.
+- A blank page at `localhost:3000`: wait ten seconds and press F5; the
+  frontend is usually the last service to become ready.
+
+### Mac
+`START-Mac.command` works but does not yet have the per-service logs or the
+isolated gcloud profile; it signs in to your default gcloud profile and logs
+everything to `error-log.txt`.
+
 ---
 
-**Last Updated**: January 14, 2026  
-**For Issues**: Check TROUBLESHOOTING section or review console output
+**Last Updated**: September 23, 2026  
+**For Issues**: Check TROUBLESHOOTING section or review console outpu
