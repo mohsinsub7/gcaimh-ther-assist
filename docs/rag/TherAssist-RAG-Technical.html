@@ -247,14 +247,14 @@
 <p>The summary for the same transcript returned <b>67 grounding chunks from 50 distinct sources</b> and rated risk <b>moderate</b> with 6 key moments. Beyond the manuals above it drew on the safety shelf (<i>SAMHSA SAFE-T Suicide Assessment</i>, <i>C-SSRS Baseline Screening</i>, <i>SAMHSA National Guidelines for Crisis Care</i>, <i>SAMHSA TIP 50</i>) for the passive-ideation moment, and on BA sources for the homework plan (<i>Brief Stepped Behavioral Activation for Primary Care</i>, <i>BA and exposure-based therapy for GAD (RCT)</i>, <i>BA, cognitive therapy and antidepressant medication in relapse prevention (RCT)</i>, <i>The Adolescent Behavioral Activation Program</i>, <i>BA for depression in older people</i>). The off-topic tail was similar in kind: postpartum-depression reviews, a type-2-diabetes psychoeducation review, a PCOS network meta-analysis, a Korean medication algorithm, and a few PDFs whose titles are file names (<code>PSM1300209</code>, <code>pone.0100100</code>, a Cochrane render).</p>
 
 <h2><span class="n">07</span>How the session proves retrieval ran</h2>
-<div class="note">Every lookup writes to the log. These lines, local or on Cloud Run, are the evidence that each call went through the corpus.</div>
+<div class="note">Every lookup writes to the log. These lines, local (<code>error-log-analysis.txt</code>) or on Cloud Run, are the evidence that each call went through the corpus; the right-hand column is what the Jane Doe session actually produced.</div>
 <table>
-<tr><th>Log line (error-log-analysis.txt locally · Cloud Run logs for ther-assist-sidecar online)</th><th>Expected</th></tr>
-<tr><td><code>[RAG PREFETCH] Querying 4 datastores for CBT: [...]</code></td><td class="ok">one per real-time call</td></tr>
-<tr><td><code>[RAG PREFETCH] Completed in &lt;ms&gt; — N passages retrieved</code></td><td class="ok">N ≥ 3</td></tr>
-<tr><td><code>[RAG] Session type 'CBT' → tools: ebt-corpus + safety-crisis + ...</code></td><td class="ok">one per comprehensive call</td></tr>
-<tr><td><code>Found N grounding chunks</code></td><td class="ok">N ≥ 20</td></tr>
-<tr><td><code>Added N citations to session summary response</code></td><td class="ok">N ≥ 1</td></tr>
+<tr><th>Log line (error-log-analysis.txt locally · Cloud Run logs for ther-assist-sidecar online)</th><th>Seen in the Jane Doe session (2026-09-23)</th></tr>
+<tr><td><code>[RAG PREFETCH] Querying 4 datastores for CBT: [...]</code></td><td class="ok">one per real-time call that was not served from the 25 s cache; a cached call logs <code>[RAG PREFETCH] Cache hit for CBT (age=Ns)</code> instead</td></tr>
+<tr><td><code>[RAG PREFETCH] Completed in &lt;ms&gt; — N passages retrieved</code></td><td class="ok">N = 3 to 9 on every real-time call (23 of 23 locally; 8 on the deployed service)</td></tr>
+<tr><td><code>[RAG] Session type 'CBT' → tools: ebt-corpus + safety-crisis + ...</code></td><td class="ok">one per comprehensive call (13 in the local session)</td></tr>
+<tr><td><code>Found N grounding chunks</code></td><td class="ok">N = 60 to 73 on comprehensive calls. Real-time responses report <code>grounding_chunks: 0</code> in their diagnostics because that path injects passages as text rather than as grounding metadata</td></tr>
+<tr><td><code>Added N citations to session summary response</code></td><td class="ok">N = 9 on the Jane Doe summary (67 grounding chunks behind them)</td></tr>
 </table>
 <div class="grid">
   <div class="card c-mint"><h4>Cache behaviour</h4><p>Results are cached 25 s per modality; within a burst of triggers a cache hit shows no new query line. Normal.</p></div>
