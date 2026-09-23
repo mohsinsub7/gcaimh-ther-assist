@@ -31,8 +31,8 @@ from google.genai import types
 # Configuration
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "brk-prj-salvador-dura-bern-sbx")
 LOCATION = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
-BASE_MODEL = "gemini-2.5-flash"
-TUNED_MODEL_DISPLAY_NAME = "therassist-clinical-flash"
+BASE_MODEL = "gemini-2.0-flash-001"
+TUNED_MODEL_DISPLAY_NAME = "therassist-clinical-flash-v2"
 TRAINING_DATA_PATH = Path(__file__).parent / "training_data.jsonl"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")

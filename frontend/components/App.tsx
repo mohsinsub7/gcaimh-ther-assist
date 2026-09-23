@@ -78,8 +78,15 @@ const App: React.FC = () => {
     return p.has('patient') && p.has('token');
   });
 
-  // Navigation state
-  const [currentView, setCurrentView] = useState<'landing' | 'patients' | 'schedule' | 'newSession' | 'patient' | 'therSummary' | 'patientSummary' | 'clientPortal' | 'clientPortalManagement'>('landing');
+  // Navigation state — default landing, OR jump straight to clientPortal when
+  // opened via the "View as Patient" button (URL has ?clientPortal=1)
+  const [currentView, setCurrentView] = useState<'landing' | 'patients' | 'schedule' | 'newSession' | 'patient' | 'therSummary' | 'patientSummary' | 'clientPortal' | 'clientPortalManagement'>(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      if (p.get('clientPortal') === '1') return 'clientPortal';
+    } catch { /* SSR safety */ }
+    return 'landing';
+  });
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [sessionPatientId, setSessionPatientId] = useState<string | null>(null);
   const [navigationHistory, setNavigationHistory] = useState<Array<{

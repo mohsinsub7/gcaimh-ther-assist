@@ -344,6 +344,313 @@ function saveMockStorage(data: MockStorage): void {
   }
 }
 
+// ─── Therapist-bridge integration for demo flow ───────────────────────
+// Reads the therapist's mock storage so that homework / interventions
+// assigned via the provider portal appear in the patient portal.
+//
+// The "active patient" is stored under `mock-active-patient-id` and set
+// by the "View as Patient" button on the therapist's patient detail page.
+//
+// Falls back to MOCK_HOMEWORK seed data when:
+//   - we're not running in a browser
+//   - no active patient is set (open Client Portal tile directly without choosing a patient)
+//   - the therapist hasn't assigned anything yet for this client
+// This keeps standalone Client Portal demos working too.
+
+const ACTIVE_PATIENT_KEY = 'mock-active-patient-id';
+const THERAPIST_BRIDGE_KEY = 'therapist-bridge-v1';
+
+function getActivePatientId(): string | null {
+  if (typeof window === 'undefined' || !window.localStorage) return null;
+  // 1. URL param wins (?asPatient=3) — lets you deep-link to a patient view for demos
+  try {
+    const fromUrl = new URLSearchParams(window.location.search).get('asPatient');
+    if (fromUrl) {
+      window.localStorage.setItem(ACTIVE_PATIENT_KEY, fromUrl);
+      return fromUrl;
+    }
+  } catch { /* SSR safety */ }
+  // 2. Otherwise fall back to whatever the "View as Patient" button set
+  return window.localStorage.getItem(ACTIVE_PATIENT_KEY);
+}
+
+function getTherapistStorage(): any | null {
+  if (typeof window === 'undefined' || !window.localStorage) return null;
+  try {
+    const raw = window.localStorage.getItem(THERAPIST_BRIDGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The therapist seed uses 'q-phq9' / 'q-gad7' IDs; the patient seed uses bare
+ * 'phq9' / 'gad7'. Normalize so we can match across the two.
+ */
+function normalizeMeasureId(id: string): string {
+  return id.replace(/^q-/, '');
+}
+
+/**
+ * Read questionnaire assignments and convert to OutcomeMeasure[] joined with
+ * catalog data. Used for the patient's Progress tab.
+ */
+function getTherapistAssignedOutcomeMeasures(patientId: string): OutcomeMeasure[] {
+  const store = getTherapistStorage();
+  if (!store?.questionnaireAssignments?.[patientId]) return [];
+  const assignments = store.questionnaireAssignments[patientId];
+  return assignments
+    .filter((a: any) => a.status === 'ACTIVE')
+    .map((a: any): OutcomeMeasure | null => {
+      const normId = normalizeMeasureId(a.questionnaireId);
+      // Find matching measure in patient catalog
+      return MOCK_OUTCOME_MEASURES.find(m => m.id === normId) || null;
+    })
+    .filter((m: OutcomeMeasure | null): m is OutcomeMeasure => m !== null);
+}
+
+/**
+ * Build an OutcomeSchedule from the therapist's active assignments.
+ */
+function getTherapistOutcomeSchedule(patientId: string): OutcomeSchedule | null {
+  const store = getTherapistStorage();
+  if (!store?.questionnaireAssignments?.[patientId]) return null;
+  const assignments = store.questionnaireAssignments[patientId];
+  const measures = assignments
+    .filter((a: any) => a.status === 'ACTIVE')
+    .map((a: any) => {
+      const measureId = normalizeMeasureId(a.questionnaireId);
+      const cadence = (a.cadence || 'WEEKLY').toLowerCase();
+      // Map therapist cadence to patient cadence type
+      const patientCadence: 'weekly' | 'biweekly' | 'monthly' =
+        cadence === 'biweekly' ? 'biweekly' : cadence === 'monthly' ? 'monthly' : 'weekly';
+      return {
+        measureId,
+        cadence: patientCadence,
+        nextDue: a.nextDueAt || weekMondayOffset(0),
+      };
+    });
+  if (measures.length === 0) return null;
+  return { measures, reminderEnabled: true };
+}
+
+/**
+ * Read past questionnaire responses for a specific measure.
+ * Reads from therapist's flat questionnaireResponses array filtered by clientId+measureId.
+ */
+function getTherapistOutcomeResponses(patientId: string, measureId: string): OutcomeResponse[] {
+  const store = getTherapistStorage();
+  const responses = store?.questionnaireResponses || [];
+  return responses
+    .filter((r: any) => r.clientId === patientId && normalizeMeasureId(r.questionnaireId) === measureId)
+    .map((r: any): OutcomeResponse => ({
+      id: r.id,
+      measureId: normalizeMeasureId(r.questionnaireId),
+      weekOf: r.weekOf,
+      responses: (r.items || []).map((i: any) => i.value ?? 0),
+      score: r.totalScore || 0,
+      completedAt: r.completedAt,
+    }));
+}
+
+/**
+ * Write a patient-submitted response back to the therapist's storage, so the
+ * therapist sees the score in their Outcomes tab + logs an Activity event.
+ */
+function writePatientOutcomeResponse(
+  patientId: string,
+  measureId: string,
+  responses: number[],
+  score: number,
+): void {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  const store = getTherapistStorage();
+  if (!store) return;
+  if (!store.questionnaireResponses) store.questionnaireResponses = [];
+
+  // Find the active assignment for this measure (to attach to)
+  const assignments = store.questionnaireAssignments?.[patientId] || [];
+  const assignment = assignments.find((a: any) =>
+    a.status === 'ACTIVE' && normalizeMeasureId(a.questionnaireId) === measureId
+  );
+
+  // Find the measure definition for severity scoring
+  const measure = MOCK_OUTCOME_MEASURES.find(m => m.id === measureId);
+  let severity = 'Unknown';
+  let severityColor: 'success' | 'info' | 'warning' | 'error' = 'info';
+  if (measure) {
+    for (const t of measure.thresholds) {
+      if (score >= t.min && score <= t.max) {
+        severity = t.label;
+        // Convert color string to MUI color name
+        const c = t.color.toLowerCase();
+        if (c.includes('green') || c === 'success') severityColor = 'success';
+        else if (c.includes('yellow') || c.includes('amber')) severityColor = 'warning';
+        else if (c.includes('red') || c === 'error') severityColor = 'error';
+        else severityColor = 'info';
+        break;
+      }
+    }
+  }
+
+  const now = new Date();
+  const weekOf = now.toISOString().slice(0, 10);
+  const response = {
+    id: `qr-pt-${Date.now()}`,
+    clientId: patientId,
+    assignmentId: assignment?.id || `inline-${measureId}`,
+    questionnaireId: assignment?.questionnaireId || `q-${measureId}`,
+    questionnaireName: measure?.name || measureId.toUpperCase(),
+    weekOf,
+    completedAt: now.toISOString(),
+    items: responses.map((value, itemIndex) => ({ itemIndex, value })),
+    totalScore: score,
+    maxScore: measure?.maxScore || 0,
+    severity,
+    severityColor,
+    flagged: false,
+  };
+  store.questionnaireResponses.unshift(response);
+
+  // Increment the assignment's completion count
+  if (assignment) {
+    assignment.completionCount = (assignment.completionCount || 0) + 1;
+    assignment.lastCompletedAt = now.toISOString();
+  }
+
+  // Activity event
+  if (!store.activityLog) store.activityLog = [];
+  store.activityLog.unshift({
+    id: `act-pt-q-${Date.now()}`,
+    clientId: patientId,
+    type: 'QUESTIONNAIRE_COMPLETED',
+    description: `${measure?.shortName || measureId.toUpperCase()} completed — score ${score} (${severity})`,
+    timestamp: now.toISOString(),
+    actor: 'client',
+  });
+
+  try {
+    window.localStorage.setItem(THERAPIST_BRIDGE_KEY, JSON.stringify(store));
+  } catch (e) {
+    console.warn('[ClientPortalMock] Failed to write outcome response:', e);
+  }
+}
+
+/**
+ * Read the therapist's published draft for the active patient, synthesize a
+ * TherapySession-shaped object so the dashboard's Session Analysis card can
+ * surface it. Returns null if no published draft exists.
+ */
+function getPublishedDraftAsSession(patientId: string): TherapySession | null {
+  const store = getTherapistStorage();
+  const draft = store?.publishDrafts?.[patientId];
+  if (!draft || !draft.published) return null;
+  const content = draft.content || {};
+  const sections = draft.sections || {};
+  return {
+    id: draft.id,
+    date: draft.sessionDate || new Date().toISOString().slice(0, 10),
+    durationMinutes: 50,
+    summary: content.clinicalNote || 'Published session summary',
+    themes: sections.themes ? (content.themes || []) : [],
+    keyMoments: sections.keyMoments ? (content.keyMoments || []) : [],
+    techniques: [],
+    homework: sections.homeworkList ? (content.homeworkList || []) : [],
+    insights: sections.nextSteps ? (content.nextSteps || []) : [],
+    emotionalState: undefined,
+  };
+}
+
+/**
+ * Read interventions assigned to a specific patient by the therapist, joined
+ * with catalog data (MOCK_INTERVENTIONS) and converted to the patient-facing
+ * Intervention shape. Returns empty array when there's no therapist data.
+ */
+function getTherapistAssignedInterventions(patientId: string): Intervention[] {
+  const store = getTherapistStorage();
+  if (!store?.interventions?.[patientId]) return [];
+  const items = store.interventions[patientId];
+  return items
+    .filter((a: any) => a.status !== 'ARCHIVED')
+    .map((a: any): Intervention => {
+      // Join with catalog so the patient sees description, duration, etc.
+      const catalog = MOCK_INTERVENTIONS.find(c => c.id === a.interventionId);
+      return {
+        id: a.interventionId,
+        title: catalog?.title || a.interventionTitle,
+        type: catalog?.type || a.interventionType,
+        description: catalog?.description || '',
+        durationSeconds: catalog?.durationSeconds || 120,
+        instructions: catalog?.instructions,
+        frequency: a.frequency,
+        recentUsageCount: a.recentUsageCount || 0,
+        journalPrompt: catalog?.journalPrompt,
+      };
+    });
+}
+
+/**
+ * Read homework assigned to a specific patient by the therapist, converted
+ * to the patient-facing HomeworkAssignment shape.
+ */
+function getTherapistAssignedHomework(patientId: string): HomeworkAssignment[] {
+  const store = getTherapistStorage();
+  if (!store?.homework?.[patientId]) return [];
+  const items = store.homework[patientId];
+  return items.map((hw: any): HomeworkAssignment => ({
+    id: hw.id,
+    moduleId: hw.moduleId,
+    moduleTitle: hw.moduleTitle,
+    assignedAt: hw.assignedAt,
+    dueAt: hw.dueAt,
+    completedAt: hw.progress?.completedAt,
+    status: hw.status === 'ARCHIVED' ? 'COMPLETED' : (hw.status as HomeworkStatus),
+    note: hw.note,
+    progress: hw.progress,
+    sourceSessionId: hw.sourceSessionId,
+    sourceSessionDate: hw.sourceSessionDate,
+  }));
+}
+
+/**
+ * Write back a status change from the patient side into the therapist's mock
+ * storage so the round-trip works (patient marks done → therapist sees it).
+ */
+function updateTherapistHomeworkStatus(
+  patientId: string,
+  homeworkId: string,
+  status: HomeworkStatus,
+): void {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  const store = getTherapistStorage();
+  if (!store?.homework?.[patientId]) return;
+  const items = store.homework[patientId];
+  const idx = items.findIndex((h: any) => h.id === homeworkId);
+  if (idx < 0) return;
+  // Therapist storage uses HomeworkBridgeStatus (no 'OVERDUE') — coerce
+  const bridgeStatus = status === 'OVERDUE' ? 'ASSIGNED' : status;
+  items[idx] = { ...items[idx], status: bridgeStatus };
+  if (status === 'COMPLETED') {
+    items[idx].progress = { ...(items[idx].progress || {}), completedAt: new Date().toISOString() };
+    // Also log an activity event so the therapist's Activity tab updates
+    if (!store.activityLog) store.activityLog = [];
+    store.activityLog.unshift({
+      id: `act-pt-${Date.now()}`,
+      clientId: patientId,
+      type: 'HOMEWORK_COMPLETED',
+      description: `Completed "${items[idx].moduleTitle}"`,
+      timestamp: new Date().toISOString(),
+      actor: 'client',
+    });
+  }
+  try {
+    window.localStorage.setItem(THERAPIST_BRIDGE_KEY, JSON.stringify(store));
+  } catch (e) {
+    console.warn('[ClientPortalMock] Failed to update therapist storage:', e);
+  }
+}
+
 function createMockProvider(): ClientPortalProvider {
   const initial = loadMockStorage();
   let journals = initial.journals;
@@ -353,10 +660,35 @@ function createMockProvider(): ClientPortalProvider {
 
   return {
     async listModules() { return MOCK_MODULES; },
-    async listHomeworkAssignments() { return MOCK_HOMEWORK; },
-    async listInterventions() { return MOCK_INTERVENTIONS; },
+
+    async listHomeworkAssignments() {
+      // Prefer therapist-assigned homework when an active patient is set.
+      // Falls back to MOCK_HOMEWORK seeds for standalone Client Portal demos.
+      const activeId = getActivePatientId();
+      if (activeId) {
+        const fromTherapist = getTherapistAssignedHomework(activeId);
+        if (fromTherapist.length > 0) return fromTherapist;
+      }
+      return MOCK_HOMEWORK;
+    },
+
+    async listInterventions() {
+      // Prefer therapist-assigned interventions when an active patient is set.
+      // Falls back to MOCK_INTERVENTIONS catalog for standalone demos so the
+      // patient always sees something useful.
+      const activeId = getActivePatientId();
+      if (activeId) {
+        const fromTherapist = getTherapistAssignedInterventions(activeId);
+        if (fromTherapist.length > 0) return fromTherapist;
+      }
+      return MOCK_INTERVENTIONS;
+    },
 
     async updateHomeworkStatus(assignmentId: string, status: HomeworkStatus) {
+      // 1. Update therapist's mock storage (round-trip: therapist sees the completion)
+      const activeId = getActivePatientId();
+      if (activeId) updateTherapistHomeworkStatus(activeId, assignmentId, status);
+      // 2. Also update local seed for standalone-demo continuity
       const hw = MOCK_HOMEWORK.find(h => h.id === assignmentId);
       if (hw) hw.status = status;
     },
@@ -402,13 +734,51 @@ function createMockProvider(): ClientPortalProvider {
     },
 
     async getIntegrativeAnalysis() { return MOCK_ANALYSIS; },
-    async listTherapySessions() { return MOCK_SESSIONS; },
-    async listOutcomeMeasures() { return MOCK_OUTCOME_MEASURES; },
-    async getOutcomeSchedule() { return MOCK_OUTCOME_SCHEDULE; },
+
+    async listTherapySessions() {
+      // If the therapist has published a session summary, surface it as the most-recent session
+      // so the dashboard's Session Analysis card shows what was published.
+      const activeId = getActivePatientId();
+      if (activeId) {
+        const published = getPublishedDraftAsSession(activeId);
+        if (published) return [published, ...MOCK_SESSIONS];
+      }
+      return MOCK_SESSIONS;
+    },
+
+    async listOutcomeMeasures() {
+      // Only show measures the therapist has actively assigned to this patient.
+      const activeId = getActivePatientId();
+      if (activeId) {
+        const assigned = getTherapistAssignedOutcomeMeasures(activeId);
+        if (assigned.length > 0) return assigned;
+      }
+      return MOCK_OUTCOME_MEASURES;
+    },
+
+    async getOutcomeSchedule() {
+      const activeId = getActivePatientId();
+      if (activeId) {
+        const fromTherapist = getTherapistOutcomeSchedule(activeId);
+        if (fromTherapist) return fromTherapist;
+      }
+      return MOCK_OUTCOME_SCHEDULE;
+    },
 
     async listOutcomeResponses(measureId: string, limit?: number) {
-      const filtered = outcomeResponses.filter(r => r.measureId === measureId).sort((a, b) => b.weekOf.localeCompare(a.weekOf));
-      return limit ? filtered.slice(0, limit) : filtered;
+      const activeId = getActivePatientId();
+      let all = outcomeResponses.filter(r => r.measureId === measureId);
+      if (activeId) {
+        const fromTherapist = getTherapistOutcomeResponses(activeId, measureId);
+        // Merge therapist responses + local — therapist wins on ID conflict
+        const therapistIds = new Set(fromTherapist.map(r => r.id));
+        all = [
+          ...fromTherapist,
+          ...all.filter(r => !therapistIds.has(r.id)),
+        ];
+      }
+      const sorted = all.sort((a, b) => b.weekOf.localeCompare(a.weekOf));
+      return limit ? sorted.slice(0, limit) : sorted;
     },
 
     async submitOutcomeResponse(resp) {
@@ -420,8 +790,14 @@ function createMockProvider(): ClientPortalProvider {
         score: resp.score,
         completedAt: new Date().toISOString(),
       };
+      // 1. Save to local outcomeResponses for fallback mode
       outcomeResponses = [newResp, ...outcomeResponses];
       persist();
+      // 2. Bridge back to therapist storage so they see the score + activity event
+      const activeId = getActivePatientId();
+      if (activeId) {
+        writePatientOutcomeResponse(activeId, resp.measureId, resp.responses, resp.score);
+      }
       return newResp;
     },
 

@@ -46,6 +46,7 @@ import {
   Delete,
   OpenInNew,
   MailOutline,
+  Visibility,
 } from '@mui/icons-material';
 import { Patient as PatientType, SessionHistory } from '../types/types';
 import InvitePatientDialog from './therapist/InvitePatientDialog';
@@ -294,6 +295,28 @@ const Patient: React.FC<PatientProps> = ({ patients, patientId, onNavigateBack, 
                 }}
               >
                 Invite to Portal
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<Visibility />}
+                onClick={() => {
+                  // Set active patient so the patient mock provider reads this client's data,
+                  // then open the client portal in a new tab so therapist & patient views can be shown side-by-side.
+                  try {
+                    window.localStorage.setItem('mock-active-patient-id', patientId);
+                  } catch { /* localStorage may be blocked */ }
+                  window.open('/?clientPortal=1', '_blank', 'noopener,noreferrer');
+                }}
+                sx={{
+                  borderRadius: 2,
+                  px: 2.5,
+                  py: 1.5,
+                  borderColor: '#10b981',
+                  color: '#0b815a',
+                  '&:hover': { borderColor: '#0b815a', bgcolor: '#ecfdf5' },
+                }}
+              >
+                View as Patient
               </Button>
               {onNavigateToClientPortal && (
                 <Button
