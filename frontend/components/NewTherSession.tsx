@@ -154,17 +154,30 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
   // Local dev: served from public/audio/  |  Production: fetched from GCS via storage-access
   const GCS_AUDIO_BUCKET = 'brk-prj-salvador-dura-bern-sbx-demo-audio';
   const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  const EXAMPLE_AUDIO_OPTIONS = [
+  // Sessions 305/307 are research-corpus recordings (interviewer "Ellie"); their
+  // licence covers research use, not public playback, so they stay hidden unless
+  // VITE_SHOW_RESEARCH_RECORDINGS=true. The Jane Doe session is fully synthetic
+  // (Gemini-written script, Gemini TTS voices) and safe for any audience; its
+  // transcript lives in docs/benchmark-demo/jane_doe_session_06_synthetic.json.
+  const RESEARCH_AUDIO_OPTIONS = [
     {
-      id: '305', name: 'Session 305', description: 'Therapy session recording (~28 min)',
+      id: '305', name: 'Session 305', description: 'Research recording (~28 min)',
       localFile: '/audio/305_AUDIO.wav',
       gcsUri: `gs://${GCS_AUDIO_BUCKET}/305_AUDIO.wav`,
     },
     {
-      id: '307', name: 'Session 307', description: 'Therapy session recording (~21 min)',
+      id: '307', name: 'Session 307', description: 'Research recording (~21 min)',
       localFile: '/audio/307_AUDIO.wav',
       gcsUri: `gs://${GCS_AUDIO_BUCKET}/307_AUDIO.wav`,
     },
+  ];
+  const EXAMPLE_AUDIO_OPTIONS = [
+    {
+      id: 'Jane Doe 6', name: 'Jane Doe — Session 6', description: 'Synthetic CBT session, PTSD + depression (~40 min)',
+      localFile: '/audio/jane-doe-session-06.mp3',
+      gcsUri: `gs://${GCS_AUDIO_BUCKET}/jane-doe-session-06.mp3`,
+    },
+    ...(import.meta.env.VITE_SHOW_RESEARCH_RECORDINGS === 'true' ? RESEARCH_AUDIO_OPTIONS : []),
   ];
 
   // Word count tracking for minimum modality suggestion threshold
