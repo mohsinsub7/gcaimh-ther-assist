@@ -20,9 +20,20 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # Error log
+# Keep the SUNY sign-in in its own gcloud profile so it never overwrites
+# (or gets overwritten by) Google Cloud credentials used for anything else.
+export CLOUDSDK_CONFIG="${CLOUDSDK_CONFIG:-$HOME/.gcloud-therassist}"
+mkdir -p "$CLOUDSDK_CONFIG"
+
+# Launcher log (setup steps). Each service also gets its own log:
+# error-log-analysis.txt, error-log-storage.txt, error-log-streaming.txt,
+# error-log-frontend.txt. One shared file hid which service had failed.
 ERROR_LOG="${SCRIPT_DIR}/error-log.txt"
 echo "TherAssist Error Log - $(date)" > "$ERROR_LOG"
 echo "" >> "$ERROR_LOG"
+for svc in analysis storage streaming frontend; do
+    : > "${SCRIPT_DIR}/error-log-${svc}.txt"
+done
 
 # Track background PIDs for cleanup
 PIDS=()
@@ -58,8 +69,8 @@ show_error() {
     echo "$2" >> "$ERROR_LOG"
     echo "" >> "$ERROR_LOG"
     echo ""
-    echo "  If this keeps happening, send the file"
-    echo "  \"error-log.txt\" (in this folder) to Mohsin."
+    echo "  If this keeps happening, send the files"
+    echo "  error-log*.txt (in this folder) to Mohsin."
     echo ""
     echo "  Press Enter to close..."
     read -r
@@ -307,7 +318,7 @@ gcloud config set billing/quota_project brk-prj-salvador-dura-bern-sbx >/dev/nul
 gcloud auth application-default login --no-launch-browser --login-config="$LOGIN_CONFIG"
 
 # Check if ADC file exists (gcloud may return non-zero even on success)
-ADC_FILE="$HOME/.config/gcloud/application_default_credentials.json"
+ADC_FILE="$CLOUDSDK_CONFIG/application_default_credentials.json"
 if [ ! -f "$ADC_FILE" ]; then
     show_error "SIGN-IN FAILED" \
 "  The Google Cloud sign-in did not complete.
@@ -346,8 +357,16 @@ setup_backend_service() {
     local SERVICE_DIR=$2
 
     if [ -d "${SERVICE_DIR}/venv" ]; then
-        echo "        ${SERVICE_NAME}... already set up"
-        return 0
+        # Re-sync packages every run: requirements.txt changes over time and an
+        # existing venv is not proof it has everything (seconds when current).
+        "${SERVICE_DIR}/venv/bin/pip" install -q -r "${SERVICE_DIR}/requirements.txt" 2>>"$ERROR_LOG"
+        if [ $? -ne 0 ]; then
+            echo "        ${SERVICE_NAME}... packages out of date, rebuilding"
+            rm -rf "${SERVICE_DIR}/venv"
+        else
+            echo "        ${SERVICE_NAME}... already set up"
+            return 0
+        fi
     fi
 
     echo "        ${SERVICE_NAME}... setting up..."
@@ -468,8 +487,8 @@ cd "${SCRIPT_DIR}/backend/therapy-analysis-function"
 GOOGLE_APPLICATION_CREDENTIALS="$ADC_FILE" \
 GOOGLE_CLOUD_PROJECT="brk-prj-salvador-dura-bern-sbx" \
 GOOGLE_CLOUD_LOCATION="us-central1" \
-venv/bin/python -m functions_framework --target=therapy_analysis --port=8090 --debug \
-    >>"$ERROR_LOG" 2>&1 &
+venv/bin/python -m functions_framework --target=therapy_analysis --port=8090 \
+    >>"${SCRIPT_DIR}/error-log-analysis.txt" 2>&1 &
 PIDS+=($!)
 echo "        therapy-analysis (8090)...started"
 
@@ -478,7 +497,7 @@ cd "${SCRIPT_DIR}/backend/storage-access-function"
 GOOGLE_APPLICATION_CREDENTIALS="$ADC_FILE" \
 GOOGLE_CLOUD_PROJECT="brk-prj-salvador-dura-bern-sbx" \
 venv/bin/python -m functions_framework --target=storage_access --port=8081 \
-    >>"$ERROR_LOG" 2>&1 &
+    >>"${SCRIPT_DIR}/error-log-storage.txt" 2>&1 &
 PIDS+=($!)
 echo "        storage-access (8081)...  started"
 
@@ -489,13 +508,13 @@ GOOGLE_CLOUD_PROJECT="brk-prj-salvador-dura-bern-sbx" \
 GOOGLE_CLOUD_LOCATION="us-central1" \
 PORT=8082 \
 venv/bin/python main.py \
-    >>"$ERROR_LOG" 2>&1 &
+    >>"${SCRIPT_DIR}/error-log-streaming.txt" 2>&1 &
 PIDS+=($!)
 echo "        streaming-stt (8082)...   started"
 
 # Start frontend
 cd "${SCRIPT_DIR}/frontend"
-npx vite --port 3000 >>"$ERROR_LOG" 2>&1 &
+npx vite --port 3000 >>"${SCRIPT_DIR}/error-log-frontend.txt" 2>&1 &
 PIDS+=($!)
 echo "        frontend (3000)...        started"
 
@@ -575,7 +594,7 @@ echo "  Your browser should have opened to TherAssist."
 echo "  If not, open Chrome and go to:"
 echo "    http://localhost:3000"
 echo ""
-echo "  Password: TherAssist2026"
+echo "  Password: ask Mohsin (also in frontend/components/PasswordGate.tsx)"
 echo ""
 echo "  IMPORTANT: Use Google Chrome for best results."
 echo "  Safari may not record audio properly."
