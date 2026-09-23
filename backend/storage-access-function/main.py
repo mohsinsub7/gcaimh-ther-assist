@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import functions_framework
-from flask import jsonify, Response, send_file
+from flask import jsonify, Response, send_file, request
 from google.cloud import storage
 import os
 import logging
