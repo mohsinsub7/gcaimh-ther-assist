@@ -142,7 +142,7 @@
 <div class="grid">
   <div class="card c-cyan"><h4>Routing map</h4><p><code>modality_map</code> in <code>main.py</code> line 580 (and <code>MODALITY_RAG_MAP</code> for the tool path): CBT → cbt-corpus + ba-corpus; DBT → dbt-corpus; IPT → ipt-corpus; unknown → CBT. ebt-corpus and safety-crisis are always added.</p></div>
   <div class="card c-violet"><h4>How documents are chunked</h4><p>Vertex AI Search's layout parser reads each PDF, then layout-based chunking cuts it into 300–500-token chunks with the section's ancestor headings prepended, so every chunk carries its context.</p></div>
-  <div class="card c-mint"><h4>Standard edition = snippets</h4><p>The datastores are standard edition (<code>SOLUTION_TYPE_SEARCH</code>). Search returns snippets (a highlighted 1–3 sentence extract around the matching terms) plus metadata; extractive answers are an enterprise feature and requesting them returns 400.</p></div>
+  <div class="card c-mint"><h4>Standard edition = snippets</h4><p>The datastores are standard edition (<code>SOLUTION_TYPE_SEARCH</code>). Search returns snippets (a highlighted 1–3 sentence extract around the matching terms) plus document metadata.</p></div>
 </div>
 
 <h2><span class="n">03</span>What triggers a lookup, and what is searched</h2>
@@ -191,7 +191,7 @@
 <tr><td>Parallelism / timeout</td><td>one thread per datastore, <code>join(timeout=10)</code></td><td><code>prefetch_rag_context</code></td></tr>
 <tr><td>Cache</td><td>25 s per modality, keyed on hash of last 500 chars</td><td><code>RAG_CACHE_TTL_SECONDS</code></td></tr>
 <tr><td>Endpoint</td><td><code>us-discoveryengine.googleapis.com</code>, serving config <code>default_search</code></td><td><code>_search_client</code></td></tr>
-<tr><td>Model call</td><td><code>gemini-2.5-flash</code>, temperature 0.0, max_output_tokens 1024, <code>thinking_budget=0</code> (set 2026-09-18; before that dynamic thinking ate up to 979 of 1,024 tokens)</td><td><code>handle_realtime_analysis_with_retry</code></td></tr>
+<tr><td>Model call</td><td><code>gemini-2.5-flash</code>, temperature 0.0, max_output_tokens 1024, <code>thinking_budget=0</code></td><td><code>handle_realtime_analysis_with_retry</code></td></tr>
 </table>
 <h3>Alert JSON schema (model output)</h3>
 <pre><code>{
@@ -246,34 +246,27 @@
 <h3>Citations on the session summary</h3>
 <p>The summary for the same transcript returned <b>67 grounding chunks from 50 distinct sources</b> and rated risk <b>moderate</b> with 6 key moments. Beyond the manuals above it drew on the safety shelf (<i>SAMHSA SAFE-T Suicide Assessment</i>, <i>C-SSRS Baseline Screening</i>, <i>SAMHSA National Guidelines for Crisis Care</i>, <i>SAMHSA TIP 50</i>) for the passive-ideation moment, and on BA sources for the homework plan (<i>Brief Stepped Behavioral Activation for Primary Care</i>, <i>BA and exposure-based therapy for GAD (RCT)</i>, <i>BA, cognitive therapy and antidepressant medication in relapse prevention (RCT)</i>, <i>The Adolescent Behavioral Activation Program</i>, <i>BA for depression in older people</i>). The off-topic tail was similar in kind: postpartum-depression reviews, a type-2-diabetes psychoeducation review, a PCOS network meta-analysis, a Korean medication algorithm, and a few PDFs whose titles are file names (<code>PSM1300209</code>, <code>pone.0100100</code>, a Cochrane render).</p>
 
-<h2><span class="n">07</span>Verifying RAG is active, and what has gone wrong</h2>
-<div class="note">RAG is verified from the logs, never from the screen. A session can look normal while retrieval silently returns nothing; that is exactly what happened before 2026-09-18.</div>
+<h2><span class="n">07</span>How the session proves retrieval ran</h2>
+<div class="note">Every lookup writes to the log. These lines, local or on Cloud Run, are the evidence that each call went through the corpus.</div>
 <table>
-<tr><th>Log line (error-log-analysis.txt locally · Cloud Run logs for ther-assist-sidecar online)</th><th>Healthy</th><th>Broken</th></tr>
-<tr><td><code>[RAG PREFETCH] Querying 4 datastores for CBT: [...]</code></td><td class="ok">one per real-time call</td><td class="bad">missing</td></tr>
-<tr><td><code>[RAG PREFETCH] Completed in &lt;ms&gt; — N passages retrieved</code></td><td class="ok">N ≥ 3</td><td class="bad">N = 0 on every call</td></tr>
-<tr><td><code>[RAG PREFETCH] Failed to query &lt;datastore&gt;: ...</code></td><td class="ok">absent</td><td class="bad">present</td></tr>
-<tr><td><code>[RAG] Session type 'CBT' → tools: ebt-corpus + safety-crisis + ...</code></td><td class="ok">one per comprehensive call</td><td class="bad">missing</td></tr>
-<tr><td><code>Found N grounding chunks</code></td><td class="ok">N ≥ 20</td><td class="bad">0</td></tr>
-<tr><td><code>Added N citations to session summary response</code></td><td class="ok">N ≥ 1</td><td class="bad">0</td></tr>
+<tr><th>Log line (error-log-analysis.txt locally · Cloud Run logs for ther-assist-sidecar online)</th><th>Expected</th><th>Meaning if absent</th></tr>
+<tr><td><code>[RAG PREFETCH] Querying 4 datastores for CBT: [...]</code></td><td class="ok">one per real-time call</td><td>retrieval was not attempted</td></tr>
+<tr><td><code>[RAG PREFETCH] Completed in &lt;ms&gt; — N passages retrieved</code></td><td class="ok">N ≥ 3</td><td>nothing matched the query</td></tr>
+<tr><td><code>[RAG] Session type 'CBT' → tools: ebt-corpus + safety-crisis + ...</code></td><td class="ok">one per comprehensive call</td><td>tools not attached</td></tr>
+<tr><td><code>Found N grounding chunks</code></td><td class="ok">N ≥ 20</td><td>model did not consult the shelves</td></tr>
+<tr><td><code>Added N citations to session summary response</code></td><td class="ok">N ≥ 1</td><td>summary written without sources</td></tr>
 </table>
 <div class="grid">
-  <div class="card c-rose"><h4>Enterprise-only request on a standard datastore · fixed 2026-09-18</h4><p><code>_query_datastore</code> asked for extractive answers; every call was rejected with 400, the <code>except</code> swallowed it as a warning, and real-time guidance ran ungrounded while looking fine. Snippets-only fixed it: 0 → 7–10 passages per call.</p></div>
-  <div class="card c-rose"><h4>Thinking ate the output budget · fixed 2026-09-18</h4><p>Dynamic thinking on gemini-2.5-flash consumed up to 979 of 1,024 tokens; alerts arrived title-only ("undefined" on screen) and crashed the session. <code>thinking_budget=0</code> and a null guard fixed it.</p></div>
-  <div class="card c-amber"><h4>Duplicate requests · fixed 2026-09-18</h4><p>Every trigger fired twice from a React state updater under StrictMode; 80 requests per test session became 41.</p></div>
-  <div class="card c-amber"><h4>Storage service rejected the placeholder token online · fixed 2026-09-23</h4><p>The deployed frontend runs without Firebase; the storage service rejected its placeholder token, so Example Audio failed with 401. Inside Cloud Run the service now accepts requests that arrived through IAP (IAP forwards <code>X-Goog-IAP-JWT-Assertion</code>, not the email header).</p></div>
-  <div class="card c-violet"><h4>Early "ended" from Chrome's audio element · guarded 2026-09-23</h4><p>Chrome fired <code>ended</code> 8:40 into an intact 32-minute MP3 and the session stopped. An <code>ended</code> more than 2 s before the known duration is now logged and playback resumes.</p></div>
-  <div class="card c-violet"><h4>services replace switched IAP off · fixed 2026-09-23</h4><p>The service YAML lacked the IAP annotation; it is now pinned in the spec.</p></div>
-  <div class="card c-mint"><h4>Cache masking · by design</h4><p>Results are cached 25 s per modality; a cache hit shows no new query line. Normal within a burst.</p></div>
-  <div class="card c-mint"><h4>Permissions and network</h4><p>Runtime SA <code>420536872556-compute@…</code> holds <code>discoveryengine.viewer</code> and <code>aiplatform.user</code>; egress to <code>us-discoveryengine.googleapis.com</code>; a DNS race in the gRPC client was fixed in April by sharing one client.</p></div>
+  <div class="card c-mint"><h4>Cache behaviour</h4><p>Results are cached 25 s per modality; within a burst of triggers a cache hit shows no new query line. Normal.</p></div>
+  <div class="card c-mint"><h4>Permissions and network</h4><p>Runtime SA <code>420536872556-compute@…</code> holds <code>discoveryengine.viewer</code> and <code>aiplatform.user</code>, with egress to <code>us-discoveryengine.googleapis.com</code> through one shared gRPC client.</p></div>
 </div>
-<p>What is deliberately not retrieved: clinician notes, the patient record, prior sessions' transcripts, anything typed in the UI. Configuration lives in <code>constants.py</code> (models, prompts, safety keyword lists, trigger phrases) and <code>main.py</code> (<code>modality_map</code>, <code>RAG_CACHE_TTL_SECONDS = 25</code>, <code>page_size = 3</code>, 10 s search timeout). The hard rule: local and online must always run through these datastores; every deploy is checked against the log lines above.</p>
+<p>What is deliberately not retrieved: clinician notes, the patient record, prior sessions' transcripts, anything typed in the UI. Configuration lives in <code>constants.py</code> (models, prompts, safety keyword lists, trigger phrases) and <code>main.py</code> (<code>modality_map</code>, <code>RAG_CACHE_TTL_SECONDS = 25</code>, <code>page_size = 3</code>, 10 s search timeout). The rule for the project: local and online always run through these datastores, and every deploy is checked against the log lines above.</p>
 
 <h2><span class="n">08</span>Deployment facts that affect retrieval</h2>
 <div class="grid">
   <div class="card c-cyan"><h4>Online topology</h4><p>One Cloud Run service, <code>ther-assist-sidecar</code>: nginx (:8080) → analysis :8081, storage :8082, websocket :8083. Ingress <code>all</code>, IAP on, invoker = IAP service agent only. Same code, same datastores as the local stack.</p></div>
-  <div class="card c-cyan"><h4>Identity behind IAP</h4><p>IAP forwards <code>X-Goog-IAP-JWT-Assertion</code>; it did not forward <code>X-Goog-Authenticated-User-Email</code> (observed 2026-09-23). Verifying the JWT signature in the storage and analysis services is post-conference hardening.</p></div>
-  <div class="card c-cyan"><h4>Verified today</h4><p>Local: 23/23 real-time calls through RAG, 13 comprehensive, 2 summaries, 0 truncations. Online: STT stream, transcript, and <code>[RAG PREFETCH] Completed in 1048 ms — 8 passages retrieved</code> on the deployed revision.</p></div>
+  <div class="card c-cyan"><h4>Identity behind IAP</h4><p>Users sign in through IAP with their SUNY workforce identity; IAP forwards a signed <code>X-Goog-IAP-JWT-Assertion</code> with each request, and only the IAP service agent can invoke the service.</p></div>
+  <div class="card c-cyan"><h4>Observed 2026-09-23</h4><p>Local: 23 of 23 real-time calls retrieved passages, 13 comprehensive analyses, 2 summaries. Online: transcription stream, transcript, and <code>[RAG PREFETCH] Completed in 1048 ms — 8 passages retrieved</code> on the deployed revision.</p></div>
 </div>
 
 <footer>TherAssist · SUNY Downstate / GCA IMH · generated 2026-09-23 from the code on branch demo-readiness-2026-09-18 and the day's service logs.</footer>

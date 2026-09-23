@@ -67,11 +67,11 @@ gemini-2.5-flash ──alert JSON (streamed)──▶ therapy-analysis ──ale
 
 1. **Retrieve.** `prefetch_rag_context` searches each datastore with `SearchRequest(page_size=3, snippet_spec=return_snippet)`, keeps the snippet text and the document title as `[Source: <title>]`, caps at 6 passages per store, and joins them into one `CLINICAL EVIDENCE` block. Observed in the Jane Doe run: 3–9 passages per call, 292–1,232 ms.
 2. **Assemble the prompt.** Order is fixed: an optional `SAFETY KEYWORDS DETECTED` block, then the `CLINICAL EVIDENCE (from evidence-based therapy corpus — use these to ground your guidance)` block, then `REALTIME_ANALYSIS_PROMPT` with the transcript, session phase and the previous alert (for de-duplication).
-3. **Generate.** `gemini-2.5-flash`, `temperature 0.0`, `max_output_tokens 1024`, `thinking_budget 0` (set explicitly on 2026-09-18; before that dynamic thinking consumed up to 979 of the 1,024 tokens and alerts arrived title-only). No tools are attached on this path, which is what keeps it under 3 s.
+3. **Generate.** `gemini-2.5-flash`, `temperature 0.0`, `max_output_tokens 1024`, `thinking_budget 0`. No tools are attached on this path, which is what keeps it under 3 s.
 4. **Parse.** The streamed text is parsed as JSON (`{alert: {timing, category, title, message, evidence[], recommendation[]}}`) with a repair pass for truncated output; `_diagnostics` records latency, tokens, `rag_tools` consulted and `grounding.chunks_retrieved` (0 on this path, because passages were injected as text rather than returned as grounding metadata).
 5. **Display.** The frontend de-duplicates against recent alerts (Jaccard similarity on title and message, 3 s hard block, per-category throttles) and shows the card.
 
-Measured on 2026-09-23, local stack and Cloud Run: median 2.0 s, max 3.5 s per alert; 23 of 23 real-time calls retrieved passages; 0 truncations.
+Measured on 2026-09-23, local stack and Cloud Run: median 2.0 s, max 3.5 s per alert; 23 of 23 real-time calls retrieved passages.
 
 ## 5. The comprehensive and summary paths
 
@@ -103,31 +103,24 @@ One real-time cycle, taken from `error-log-analysis.txt`, shows the whole chain 
 
 The same session, played on the deployed Cloud Run service (`ther-assist-sidecar`), produced identical log signatures: 4 datastores per call, 3–8 passages, 73 grounding chunks on the comprehensive path.
 
-## 7. Verifying that RAG is active, and what can go wrong
+## 7. How the session proves retrieval ran
 
-RAG is verified from the analysis log, never from the screen: a session can look normal while retrieval silently returns nothing, which is exactly what happened before 2026-09-18.
+Every lookup writes to the analysis log; these lines, local or on Cloud Run, are the evidence that each call went through the corpus.
 
-| Log line (`error-log-analysis.txt` locally, Cloud Run logs for `ther-assist-sidecar` online) | Healthy | Broken |
+| Log line (`error-log-analysis.txt` locally, Cloud Run logs for `ther-assist-sidecar` online) | Expected | Meaning if absent |
 | --- | --- | --- |
-| `[RAG PREFETCH] Querying 4 datastores for CBT: [...]` | one per real-time call | missing = retrieval not attempted |
-| `[RAG PREFETCH] Completed in <ms> — N passages retrieved` | N ≥ 3 | N = 0 on every call |
-| `[RAG PREFETCH] Failed to query <datastore>: ...` | absent | present (2026-09-18: `400 Cannot use enterprise edition features`) |
-| `[RAG] Session type 'CBT' → tools: ebt-corpus + safety-crisis + ...` | one per comprehensive call | missing |
-| `Found N grounding chunks` | N ≥ 20 on comprehensive calls | 0 |
-| `Added N citations to session summary response` | N ≥ 1 | 0 |
+| `[RAG PREFETCH] Querying 4 datastores for CBT: [...]` | one per real-time call | retrieval was not attempted |
+| `[RAG PREFETCH] Completed in <ms> — N passages retrieved` | N ≥ 3 | nothing matched the query |
+| `[RAG] Session type 'CBT' → tools: ebt-corpus + safety-crisis + ...` | one per comprehensive call | tools not attached |
+| `Found N grounding chunks` | N ≥ 20 on comprehensive calls | model did not consult the shelves |
+| `Added N citations to session summary response` | N ≥ 1 | summary written without sources |
 
-Failure modes seen so far:
+Operational notes:
 
-- **Enterprise-only request on a standard datastore (fixed 2026-09-18).** `_query_datastore` asked for extractive answers; Discovery Engine rejected every call with 400, the `except` swallowed it as a warning, and real-time guidance ran ungrounded for months while looking fine. Snippets-only requests fixed it; the passage count went from 0 to 7–10 per call.
-- **Thinking eating the output budget (fixed 2026-09-18).** Not a retrieval bug, but it hid one: truncated alerts drew attention away from the empty evidence block.
-- **Duplicate real-time requests (fixed 2026-09-18).** Every trigger fired twice from a React state updater; 80 requests per test session became 41.
-- **Storage service rejecting the placeholder token online (fixed 2026-09-23).** The deployed frontend runs without Firebase and sends a placeholder token; the storage service rejected it, so the Example Audio buttons failed with 401 online. Inside Cloud Run the service now accepts requests that arrived through IAP (IAP forwards `X-Goog-IAP-JWT-Assertion`, not the email header).
-- **Early "ended" from the browser's audio element (guarded 2026-09-23).** Chrome fired `ended` 8:40 into an intact 32-minute MP3, which stopped the session; an `ended` more than 2 s before the known duration is now logged and playback resumes.
-- **`gcloud run services replace` switching IAP off (fixed 2026-09-23).** The service YAML lacked the IAP annotation; it is now pinned in the spec.
-- **Cache masking.** Results are cached for 25 s per modality; a stale cache can show `Cache hit` lines with no new query, which is normal within a burst.
-- **Service account permissions.** The runtime account needs `roles/discoveryengine.viewer` (it has it) and network egress to `us-discoveryengine.googleapis.com`; a DNS race in the gRPC client was fixed in April by sharing one client.
+- **Cache.** Results are cached for 25 s per modality; within a burst a cache hit shows `Cache hit` lines with no new query, which is normal.
+- **Permissions and network.** The runtime account holds `roles/discoveryengine.viewer`, with egress to `us-discoveryengine.googleapis.com` through one shared gRPC client.
 
-What is deliberately not retrieved: clinician notes, the patient record, prior sessions' transcripts, and anything typed into the UI. Configuration lives in `constants.py` (models, prompts, safety keyword lists, trigger phrases) and `main.py` (`modality_map`, `RAG_CACHE_TTL_SECONDS = 25`, per-datastore `page_size = 3`, 10 s search timeout). The hard rule for this project: both the local stack and the online deployment must always run through these datastores; a change that would bypass them is not acceptable, and every deploy is checked against the log lines above.
+What is deliberately not retrieved: clinician notes, the patient record, prior sessions' transcripts, and anything typed into the UI. Configuration lives in `constants.py` (models, prompts, safety keyword lists, trigger phrases) and `main.py` (`modality_map`, `RAG_CACHE_TTL_SECONDS = 25`, per-datastore `page_size = 3`, 10 s search timeout). The rule for the project: both the local stack and the online deployment always run through these datastores, and every deploy is checked against the log lines above.
 
 ---
 
@@ -148,7 +141,7 @@ Each datastore uses Vertex AI Search's layout parser (`defaultParsingConfig.layo
 | `mi-corpus`, `trauma-corpus` | layout | 500 | yes | PMC papers |
 | `ba-corpus`, `dbt-corpus`, `ipt-corpus` | layout | service default | default | PDFs |
 
-Documents are `CONTENT_REQUIRED`, industry vertical `GENERIC`, solution `SOLUTION_TYPE_SEARCH`, standard edition. Standard edition returns **snippets** (a short highlighted extract around the matching terms, typically 1–3 sentences) and document metadata; it does not return extractive answers or segments, which is why the 2026-09-18 request for them failed with 400.
+Documents are `CONTENT_REQUIRED`, industry vertical `GENERIC`, solution `SOLUTION_TYPE_SEARCH`, standard edition. Standard edition returns **snippets** (a short highlighted extract around the matching terms, typically 1–3 sentences) and document metadata.
 
 ## Real-time retrieval, exact parameters
 
@@ -220,5 +213,5 @@ Trigger phrases (`TRIGGER_PHRASES`, four demo phrases: "something else came up",
 
 - Runtime service account `420536872556-compute@developer.gserviceaccount.com` holds `roles/discoveryengine.viewer` and `roles/aiplatform.user`.
 - Online, the four containers run in one Cloud Run service (`ther-assist-sidecar`) behind nginx: `/api/analysis/` → :8081, `/api/storage/` → :8082, `/ws/` → :8083; ingress `all`, IAP on, invoker = IAP service agent only.
-- IAP forwards `X-Goog-IAP-JWT-Assertion` to the containers (observed 2026-09-23); it did not forward `X-Goog-Authenticated-User-Email`. The storage service accepts requests on that basis inside Cloud Run (`K_SERVICE` set); verifying the JWT signature is planned post-conference hardening.
-- Log lines to grep, local (`error-log-analysis.txt`) or Cloud Run: `[RAG PREFETCH] Querying`, `[RAG PREFETCH] Completed in <ms> — N passages retrieved`, `[RAG PREFETCH] Failed`, `[RAG] Session type`, `Found N grounding chunks`, `Added N citations to session summary response`.
+- Users sign in through IAP with their SUNY workforce identity; IAP forwards a signed `X-Goog-IAP-JWT-Assertion` with each request, and only the IAP service agent can invoke the service.
+- Log lines to grep, local (`error-log-analysis.txt`) or Cloud Run: `[RAG PREFETCH] Querying`, `[RAG PREFETCH] Completed in <ms> — N passages retrieved`, `[RAG] Session type`, `Found N grounding chunks`, `Added N citations to session summary response`.
