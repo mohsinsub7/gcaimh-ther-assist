@@ -628,9 +628,11 @@ The manual steps above are the long way. On Windows the launcher does all of it.
   frontend is usually the last service to become ready.
 
 ### Mac
-`START-Mac.command` works but does not yet have the per-service logs or the
-isolated gcloud profile; it signs in to your default gcloud profile and logs
-everything to `error-log.txt`.
+`START-Mac.command` does the same as the Windows launcher: it signs in under a
+private gcloud profile (`~/.gcloud-therassist`), re-syncs Python packages on every
+start and writes the same four `error-log-*.txt` files. No `T:` drive step on Mac.
+Double-click it in Finder; if macOS says it cannot be opened, right-click → Open once.
+Use Google Chrome for the microphone; Safari does not record audio reliably.
 
 ---
 

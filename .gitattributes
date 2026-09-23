@@ -1,0 +1,5 @@
+# Shell scripts must stay LF: a CRLF .command file fails on macOS with "$: command not found".
+*.command text eol=lf
+*.sh text eol=lf
+# Windows batch files run under cmd.exe and are safest with CRLF.
+*.bat text eol=crlf
