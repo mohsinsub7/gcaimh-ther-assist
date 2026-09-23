@@ -249,12 +249,12 @@
 <h2><span class="n">07</span>How the session proves retrieval ran</h2>
 <div class="note">Every lookup writes to the log. These lines, local or on Cloud Run, are the evidence that each call went through the corpus.</div>
 <table>
-<tr><th>Log line (error-log-analysis.txt locally · Cloud Run logs for ther-assist-sidecar online)</th><th>Expected</th><th>Meaning if absent</th></tr>
-<tr><td><code>[RAG PREFETCH] Querying 4 datastores for CBT: [...]</code></td><td class="ok">one per real-time call</td><td>retrieval was not attempted</td></tr>
-<tr><td><code>[RAG PREFETCH] Completed in &lt;ms&gt; — N passages retrieved</code></td><td class="ok">N ≥ 3</td><td>nothing matched the query</td></tr>
-<tr><td><code>[RAG] Session type 'CBT' → tools: ebt-corpus + safety-crisis + ...</code></td><td class="ok">one per comprehensive call</td><td>tools not attached</td></tr>
-<tr><td><code>Found N grounding chunks</code></td><td class="ok">N ≥ 20</td><td>model did not consult the shelves</td></tr>
-<tr><td><code>Added N citations to session summary response</code></td><td class="ok">N ≥ 1</td><td>summary written without sources</td></tr>
+<tr><th>Log line (error-log-analysis.txt locally · Cloud Run logs for ther-assist-sidecar online)</th><th>Expected</th></tr>
+<tr><td><code>[RAG PREFETCH] Querying 4 datastores for CBT: [...]</code></td><td class="ok">one per real-time call</td></tr>
+<tr><td><code>[RAG PREFETCH] Completed in &lt;ms&gt; — N passages retrieved</code></td><td class="ok">N ≥ 3</td></tr>
+<tr><td><code>[RAG] Session type 'CBT' → tools: ebt-corpus + safety-crisis + ...</code></td><td class="ok">one per comprehensive call</td></tr>
+<tr><td><code>Found N grounding chunks</code></td><td class="ok">N ≥ 20</td></tr>
+<tr><td><code>Added N citations to session summary response</code></td><td class="ok">N ≥ 1</td></tr>
 </table>
 <div class="grid">
   <div class="card c-mint"><h4>Cache behaviour</h4><p>Results are cached 25 s per modality; within a burst of triggers a cache hit shows no new query line. Normal.</p></div>
