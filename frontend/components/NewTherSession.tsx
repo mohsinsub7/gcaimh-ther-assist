@@ -156,12 +156,12 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
   const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   const EXAMPLE_AUDIO_OPTIONS = [
     {
-      id: '305', name: 'Session 305', description: 'Therapy session recording (~7 min)',
+      id: '305', name: 'Session 305', description: 'Therapy session recording (~28 min)',
       localFile: '/audio/305_AUDIO.wav',
       gcsUri: `gs://${GCS_AUDIO_BUCKET}/305_AUDIO.wav`,
     },
     {
-      id: '307', name: 'Session 307', description: 'Therapy session recording (~5 min)',
+      id: '307', name: 'Session 307', description: 'Therapy session recording (~21 min)',
       localFile: '/audio/307_AUDIO.wav',
       gcsUri: `gs://${GCS_AUDIO_BUCKET}/307_AUDIO.wav`,
     },
