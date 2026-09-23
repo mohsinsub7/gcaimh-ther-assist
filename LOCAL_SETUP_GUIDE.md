@@ -615,6 +615,13 @@ The manual steps above are the long way. On Windows the launcher does all of it.
 5. Leave the launcher window open while you use the app; closing it stops
    the services.
 
+### Demo recordings
+The two session recordings behind the "Session 305" / "Session 307" buttons
+(`305_AUDIO.wav`, `307_AUDIO.wav`) are deliberately not in git. Get them from
+Mohsin and copy them to `frontend/public/audio/` (the file names must match
+exactly). Without them those two buttons show an error; "Upload Audio" still
+works with any `.wav`/`.mp3` you pick from your own disk.
+
 ### If something fails
 - Each service writes its own log next to the launcher:
   `error-log-analysis.txt`, `error-log-storage.txt`,
