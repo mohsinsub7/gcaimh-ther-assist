@@ -58,6 +58,17 @@ def is_email_authorized(email: str) -> bool:
 
 def verify_firebase_token(token: str):
     """Verify Firebase ID token and return decoded claims"""
+    # Inside Cloud Run (K_SERVICE set) this service runs behind IAP, which
+    # authenticates every caller against the SUNY workforce pool and then adds
+    # X-Goog-Authenticated-User-Email to the request (client-supplied copies are
+    # stripped by IAP). The deployed frontend has no Firebase config and sends a
+    # placeholder token, so trust IAP's identity header there. Local dev unchanged.
+    if os.environ.get('K_SERVICE'):
+        iap_user = request.headers.get('X-Goog-Authenticated-User-Email', '')
+        if iap_user:
+            email = iap_user.split(':', 1)[-1]
+            logging.info(f"[IAP AUTH] Request pre-authenticated by IAP as {email}")
+            return {'email': email, 'iap': True}
     try:
         decoded_token = auth.verify_id_token(token)
         email = decoded_token.get('email')
