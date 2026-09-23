@@ -4,6 +4,10 @@ metadata:
   name: ther-assist-sidecar
   annotations:
     run.googleapis.com/launch-stage: BETA
+    # IAP is the only thing between the internet and this service: keep it here
+    # so that 'gcloud run services replace' never silently switches it off.
+    run.googleapis.com/iap-enabled: 'true'
+    run.googleapis.com/ingress: all
 spec:
   template:
     metadata:
