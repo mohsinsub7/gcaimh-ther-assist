@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Where TherAssist&#x27;s Advice Comes From</title><style>
+:root{--ink:#16202B;--muted:#5B6875;--rule:#DDE3EA;--wash:#F6F8FA;--navy:#1F3A5F}
+body{margin:0;background:#fff;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.55}
+main{max-width:880px;margin:0 auto;padding:32px 24px 64px}
+h1{font-size:28px;margin:0 0 4px;letter-spacing:-.01em} h1+h2{font-size:18px;color:var(--muted);font-weight:500;margin:0 0 18px}
+h2{font-size:21px;margin:36px 0 10px;padding-top:14px;border-top:1px solid var(--rule)} h3{font-size:17px;margin:24px 0 8px}
+p,li{max-width:78ch} table{border-collapse:collapse;width:100%;margin:12px 0 18px;font-size:14.5px}
+th,td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--rule)} th{color:var(--muted);font-weight:600;background:var(--wash)}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em;background:var(--wash);padding:1px 5px;border-radius:3px}
+pre{background:var(--wash);border:1px solid var(--rule);border-radius:4px;padding:12px 14px;overflow:auto;font-size:13.5px;line-height:1.5} pre code{background:none;padding:0}
+em{color:var(--muted)} hr{border:0;border-top:2px solid var(--rule);margin:40px 0}
+@media print{main{padding:0} h2{break-after:avoid} table,pre{break-inside:avoid}}
+</style></head><body><main>
+<h1>Where TherAssist's Advice Comes From</h1>
+<h2>Plain-language guide for presenters</h2>
+<p><em>As of 2026-09-23 · Muhammad (Mohsin) Sardar</em></p>
+<h2>The one-paragraph answer</h2>
+<p>TherAssist listens to the session, and every few seconds it takes the last thing that was said and looks it up in a library of therapy manuals, published research and crisis protocols that our clinical team chose. It hands the passages it finds, together with the transcript, to the AI, and asks for one short suggestion. So when a card appears on the therapist's screen, it was written with real clinical sources open on the desk, and the session summary shows which sources those were. The AI proposes; the therapist decides.</p>
+<h2>The library</h2>
+<p>The library is a curated set of clinical documents, about 3,460 in total, held in Google's search service inside SUNY's own cloud project; nothing in it comes from the open internet at run time.</p>
+<table>
+<thead>
+<tr>
+<th>Shelf</th>
+<th>What is on it</th>
+<th>Documents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Therapy manuals</td>
+<td>Core evidence-based treatment protocols (the "how to" of CBT, exposure, activation)</td>
+<td>94</td>
+</tr>
+<tr>
+<td>Safety and crisis</td>
+<td>Suicide-risk assessment standards, including the 988 Lifeline guidance, and crisis protocols</td>
+<td>9</td>
+</tr>
+<tr>
+<td>CBT research</td>
+<td>Published clinical research papers on cognitive-behavioral therapy</td>
+<td>196</td>
+</tr>
+<tr>
+<td>Behavioral activation</td>
+<td>Research and protocols on scheduling activities to lift depression</td>
+<td>76</td>
+</tr>
+<tr>
+<td>DBT</td>
+<td>Dialectical behavior therapy sources</td>
+<td>6</td>
+</tr>
+<tr>
+<td>IPT</td>
+<td>Interpersonal psychotherapy sources</td>
+<td>75</td>
+</tr>
+<tr>
+<td>Session transcripts</td>
+<td>De-identified therapy transcript excerpts, used to recognise patterns such as avoidance or a strained alliance</td>
+<td>3,000</td>
+</tr>
+</tbody>
+</table>
+<p>Two more shelves exist (motivational interviewing and trauma-informed care) but are not yet connected to the app. What is deliberately not in the library: the patient's own record, notes the therapist types, previous sessions, and anything from the web. The AI can only ground a suggestion in what the clinical team put on these shelves.</p>
+<h2>The journey of a sentence</h2>
+<p>From a spoken sentence to a card on the screen takes about two seconds, and the lookup happens in the middle of it.</p>
+<pre><code>Words spoken
+  → Transcript (speech-to-text)
+  → Every ~8 new words: look up the last minute of conversation
+  → Library search, 4 shelves at once
+  → 3 to 9 matching passages
+  → AI reads the passages together with the transcript
+  → One short suggestion on the therapist's screen
+</code></pre>
+<p>Reading the flow: the words are transcribed as they are spoken; roughly every eight new words the system takes the most recent stretch of conversation and searches four shelves of the library with it; the passages that match are placed in front of the AI together with the transcript; the AI writes one suggestion; the therapist sees it as a card.</p>
+<p>A real example from the Jane Doe demo session. Jane and Dr. Alvarez were reviewing homework: "Can you tell me how it went filling out that activity log? … those couple of hours on Saturday, was that when you were planning to bake cookies for your sister? Yeah, I actually did it, she came over." Those words became the search. The library returned nine passages, from the behavioral-activation and CBT shelves, about scheduling activities and reinforcing the ones a client completes. Two seconds later the card read <strong>"Behavioral Activation Opportunity"</strong>, suggesting the therapist reinforce the completed activity and connect it to Jane's sense of being able to act. No one typed a keyword; the patient's own words did the looking up.</p>
+<h2>What makes it look something up</h2>
+<p>Three things decide when the library is consulted and which shelves are opened; none of them is a hidden keyword list that the patient has to hit.</p>
+<ol>
+<li><strong>Talking.</strong> Every eight or so new words that the transcription has finalised start a lookup. Silence, half-finished words and typed notes do not. If the room is quiet for the first twenty seconds, one lookup runs anyway so the screen is never empty.</li>
+<li><strong>The modality the therapist chose.</strong> At the start of a session the therapist picks CBT, DBT or IPT. That choice opens the matching shelves: CBT opens the CBT research and behavioral-activation shelves; DBT opens the DBT shelf; IPT the IPT shelf. The therapy-manuals shelf and the safety shelf are open in every session.</li>
+<li><strong>Safety words.</strong> Separately from the library search, a fixed list of about 90 phrases is checked on every lookup: talk of suicide or not wanting to be alive, self-harm, harming others, abuse, overdose or relapse. If any appears, the system forces a safety card whatever the AI would otherwise have said, tells the AI which phrase it heard, and gives the deeper analysis more room to reason. This list is a safety net under the AI, not the only way safety is noticed.</li>
+</ol>
+<p>So the answer to "what words trigger it?" is: any words, because the search uses the last minute or so of the conversation itself as the question. The safety phrases are the one exception where a specific word changes what happens.</p>
+<h2>Why this matters, and the honest limits</h2>
+<p>An AI that answers from memory alone can sound confident and be wrong; an AI that must first read passages from a vetted library is anchored to what the field has actually published, and it can show its sources.</p>
+<ul>
+<li><strong>Grounded, not improvised.</strong> Every suggestion is written with retrieved passages in front of the model. The session summary lists its citations, so a clinician can see which manual or paper a recommendation leaned on.</li>
+<li><strong>Curated by clinicians.</strong> The shelves were chosen and filled by the clinical team. Adding a new protocol means adding documents to a shelf, not retraining a model.</li>
+<li><strong>Same rule online and in the clinic.</strong> The version on the laptop and the version in SUNY's cloud use the same library and the same steps; we verify this after every change by reading the system's own logs, which record each lookup and how many passages it returned.</li>
+</ul>
+<p>The limits, said plainly:</p>
+<ul>
+<li>The search can come back with little or nothing relevant. The AI is then working from the transcript and its general training, and the card will be more generic.</li>
+<li>The AI still chooses the wording. Grounding narrows what it says; it does not make it infallible.</li>
+<li>The therapist decides. Cards are prompts to consider, never instructions; nothing is sent to the patient.</li>
+<li>The library is only as good as what is on the shelves. The DBT shelf, for instance, has six documents today; CBT has almost two hundred.</li>
+</ul>
+<h2>Talking points and likely questions</h2>
+<p>Three sentences to say on stage, then the questions an audience usually asks.</p>
+<ul>
+<li>"Every suggestion you'll see was written after the system looked up the last minute of conversation in a library our clinicians built: therapy manuals, published research, crisis protocols."</li>
+<li>"The patient's own words are the search. Nobody types anything; roughly every eight words it looks again."</li>
+<li>"The AI proposes, with its sources; the therapist decides. And the safety net is a fixed list of crisis phrases that forces a safety card no matter what."</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Likely question</th>
+<th>Short answer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Is it searching the internet?</td>
+<td>No. Only SUNY's own library of about 3,500 clinical documents, inside SUNY's cloud project.</td>
+</tr>
+<tr>
+<td>What if it finds nothing?</td>
+<td>The card is more generic. The logs show how many passages each lookup returned, so we know when that happens.</td>
+</tr>
+<tr>
+<td>Does it diagnose?</td>
+<td>No. It reads for process and risk and suggests; it does not label the patient.</td>
+</tr>
+<tr>
+<td>Where does the patient's data go?</td>
+<td>The transcript is processed inside the SUNY cloud project in the US; nothing goes to the public internet, and nothing is used to train models.</td>
+</tr>
+<tr>
+<td>How do you know it used the library?</td>
+<td>Every lookup writes a log line with the shelves searched and the passages found; we check them after each change.</td>
+</tr>
+<tr>
+<td>Can it miss a crisis?</td>
+<td>The fixed phrase list catches explicit language regardless of the AI, and the safety shelf is consulted on every call; subtle cues still depend on the model and, above all, the clinician.</td>
+</tr>
+<tr>
+<td>Who chose what is in the library?</td>
+<td>The clinical team. Adding a protocol means adding documents to a shelf.</td>
+</tr>
+<tr>
+<td>How fast is it?</td>
+<td>About two seconds from the words being spoken to the card; the deeper analysis and the end-of-session summary take longer.</td>
+</tr>
+</tbody>
+</table>
+</main></body></html>
