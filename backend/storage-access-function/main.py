@@ -65,10 +65,22 @@ def verify_firebase_token(token: str):
     # placeholder token, so trust IAP's identity header there. Local dev unchanged.
     if os.environ.get('K_SERVICE'):
         iap_user = request.headers.get('X-Goog-Authenticated-User-Email', '')
+        iap_jwt = request.headers.get('X-Goog-IAP-JWT-Assertion', '')
         if iap_user:
             email = iap_user.split(':', 1)[-1]
-            logging.info(f"[IAP AUTH] Request pre-authenticated by IAP as {email}")
+            logging.info(f"[IAP AUTH] Pre-authenticated by IAP (email header) as {email}")
             return {'email': email, 'iap': True}
+        if iap_jwt:
+            logging.info("[IAP AUTH] Pre-authenticated by IAP (JWT assertion header present)")
+            return {'email': 'iap-authenticated@downstate.edu', 'iap': True}
+        # Direct-on-Cloud-Run IAP does not always forward the identity headers
+        # (observed 2026-09-23). The service is only invokable by the IAP service
+        # agent, so a request that reaches this code has passed IAP; accept the
+        # frontend's placeholder token here exactly as the streaming service does.
+        if token.startswith('mock-'):
+            present = [h for h in request.headers.keys() if h.lower().startswith('x-goog') or h.lower().startswith('x-serverless')]
+            logging.info(f"[IAP AUTH] Placeholder token accepted inside Cloud Run; identity headers present: {present}")
+            return {'email': 'iap-authenticated@downstate.edu', 'iap': True}
     try:
         decoded_token = auth.verify_id_token(token)
         email = decoded_token.get('email')
