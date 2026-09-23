@@ -1,486 +1,282 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TherAssist RAG: Technical Reference</title><style>
-:root{--ink:#16202B;--muted:#5B6875;--rule:#DDE3EA;--wash:#F6F8FA;--navy:#1F3A5F}
-body{margin:0;background:#fff;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.55}
-main{max-width:880px;margin:0 auto;padding:32px 24px 64px}
-h1{font-size:28px;margin:0 0 4px;letter-spacing:-.01em} h1+h2{font-size:18px;color:var(--muted);font-weight:500;margin:0 0 18px}
-h2{font-size:21px;margin:36px 0 10px;padding-top:14px;border-top:1px solid var(--rule)} h3{font-size:17px;margin:24px 0 8px}
-p,li{max-width:78ch} table{border-collapse:collapse;width:100%;margin:12px 0 18px;font-size:14.5px}
-th,td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--rule)} th{color:var(--muted);font-weight:600;background:var(--wash)}
-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em;background:var(--wash);padding:1px 5px;border-radius:3px}
-pre{background:var(--wash);border:1px solid var(--rule);border-radius:4px;padding:12px 14px;overflow:auto;font-size:13.5px;line-height:1.5} pre code{background:none;padding:0}
-em{color:var(--muted)} hr{border:0;border-top:2px solid var(--rule);margin:40px 0}
-@media print{main{padding:0} h2{break-after:avoid} table,pre{break-inside:avoid}}
-</style></head><body><main>
-<h1>TherAssist RAG: How the Corpus Shapes Every Suggestion</h1>
-<h2>Technical reference</h2>
-<p><em>As of 2026-09-23 · Muhammad (Mohsin) Sardar · branch <code>demo-readiness-2026-09-18</code>, Cloud Run revision <code>ther-assist-sidecar-00013-97d</code>. File paths are relative to <code>gcaimh-ther-assist-DEV/</code>.</em></p>
-<h2>1. Overview: where retrieval happens</h2>
-<p>Every piece of guidance TherAssist shows is produced after the model has read passages retrieved from the therapy corpus; there is no path that skips retrieval. Retrieval runs in three places, using two mechanisms.</p>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TherAssist RAG — Technical Reference</title>
+<style>
+  :root{
+    --bg:#070b16; --bg2:#0c1327; --panel:#101a33; --panel2:#152142; --line:#22305a;
+    --ink:#e8eefc; --muted:#9aa8c7; --faint:#6b7aa0;
+    --cyan:#37e6ff; --violet:#9b7bff; --mint:#4ef0b8; --amber:#ffc857; --rose:#ff5c8a;
+    --sans:"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 10% -10%,#17265a 0%,transparent 60%),radial-gradient(900px 500px at 100% 0%,#2a1a5e 0%,transparent 55%),var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55}
+  a{color:var(--cyan);text-decoration:none}
+  main{max-width:1080px;margin:0 auto;padding:40px 28px 80px}
+  .hero{position:relative;padding:36px 36px 30px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(135deg,rgba(55,230,255,.08),rgba(155,123,255,.10) 50%,rgba(78,240,184,.06));overflow:hidden}
+  .hero:before{content:"";position:absolute;inset:-40%;background:conic-gradient(from 180deg,transparent,rgba(55,230,255,.15),transparent 30%,rgba(155,123,255,.18),transparent 60%);animation:spin 28s linear infinite;pointer-events:none}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .hero>*{position:relative}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--cyan)}
+  h1{font-size:34px;margin:8px 0 6px;letter-spacing:-.02em;line-height:1.15}
+  .sub{color:var(--muted);max-width:76ch;margin:0}
+  .meta{margin-top:16px;font-family:var(--mono);font-size:12.5px;color:var(--faint)}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:22px 0 0}
+  .stat{background:rgba(7,11,22,.55);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .stat b{display:block;font-size:24px;letter-spacing:-.02em;color:#fff}
+  .stat span{font-size:12.5px;color:var(--muted)}
+  h2{font-size:22px;margin:52px 0 14px;letter-spacing:-.01em;display:flex;align-items:center;gap:12px}
+  h2 .n{font-family:var(--mono);font-size:12px;color:var(--bg);background:var(--cyan);border-radius:999px;padding:3px 9px;letter-spacing:.1em}
+  h3{font-size:16px;margin:24px 0 8px;color:#fff}
+  p{max-width:80ch}
+  .lead{font-size:17px;color:#cfd8f3}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin:16px 0}
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:14px;padding:16px 18px;position:relative}
+  .card:before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:3px;border-radius:3px;background:var(--accent,var(--cyan))}
+  .card h4{margin:0 0 6px;font-size:15px;color:#fff}
+  .card p{margin:0;font-size:14px;color:var(--muted)}
+  .c-cyan{--accent:var(--cyan)} .c-violet{--accent:var(--violet)} .c-mint{--accent:var(--mint)} .c-amber{--accent:var(--amber)} .c-rose{--accent:var(--rose)}
+  table{border-collapse:separate;border-spacing:0;width:100%;margin:14px 0 22px;font-size:14px;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  th,td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--line)}
+  th{background:var(--panel2);color:var(--cyan);font-weight:600;font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+  tr:last-child td{border-bottom:0}
+  code{font-family:var(--mono);font-size:.9em;background:rgba(55,230,255,.09);color:#bff3ff;padding:1px 6px;border-radius:5px}
+  pre{background:#070b16;border:1px solid var(--line);border-radius:12px;padding:14px 16px;overflow:auto;font-size:13px;line-height:1.5;color:#cfe9ff}
+  pre code{background:none;padding:0;color:inherit}
+  .pipe{margin:18px 0 8px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px}
+  .pipe svg{width:100%;height:auto;display:block}
+  .cap{font-size:13px;color:var(--faint);margin:6px 2px 0}
+  .timeline{list-style:none;margin:16px 0;padding:0;border-left:2px solid var(--line)}
+  .timeline li{position:relative;padding:0 0 18px 24px}
+  .timeline li:before{content:"";position:absolute;left:-7px;top:6px;width:12px;height:12px;border-radius:50%;background:var(--bg);border:2px solid var(--accent,var(--cyan));box-shadow:0 0 10px var(--accent,var(--cyan))}
+  .timeline b{color:#fff}
+  .timeline .t{font-family:var(--mono);font-size:12px;color:var(--mint);margin-left:8px}
+  .chunk{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--violet);border-radius:10px;padding:12px 14px;margin:10px 0}
+  .chunk .src{font-weight:600;color:#fff;font-size:14px}
+  .chunk .ds{font-family:var(--mono);font-size:11.5px;color:var(--violet);margin-left:8px}
+  .chunk .q{color:var(--muted);font-size:13.5px;margin-top:4px;font-style:italic}
+  .note{border:1px solid rgba(255,200,87,.35);background:rgba(255,200,87,.07);border-radius:12px;padding:12px 16px;color:#ffe3a3;font-size:14px}
+  .bad{color:var(--rose)} .ok{color:var(--mint)}
+  footer{margin-top:60px;color:var(--faint);font-size:12.5px;font-family:var(--mono)}
+  @media print{body{background:#fff;color:#111}.hero:before{display:none}.card,.pipe,table,pre,.chunk{background:#fff;border-color:#ccc}h2 .n{background:#333;color:#fff}code{color:#123;background:#eef}}
+</style>
+</head>
+<body>
+<main>
+
+<section class="hero">
+  <div class="eyebrow">TherAssist · Retrieval-augmented guidance</div>
+  <h1>How the corpus shapes every suggestion</h1>
+  <p class="sub">Technical reference for the engineering team. Every card, metric and summary TherAssist shows is generated after the model has read passages retrieved from a clinician-curated corpus held in Vertex AI Search. There is no path that skips retrieval. This page explains where retrieval happens, what triggers it, exactly what is sent and returned, and how to prove from the logs that it ran.</p>
+  <div class="meta">As of 2026-09-23 · branch demo-readiness-2026-09-18 · Cloud Run revision ther-assist-sidecar-00013-97d · project brk-prj-salvador-dura-bern-sbx · paths relative to gcaimh-ther-assist-DEV/</div>
+  <div class="stats">
+    <div class="stat"><b>3,462</b><span>documents across 9 datastores</span></div>
+    <div class="stat"><b>~8 words</b><span>between lookups</span></div>
+    <div class="stat"><b>200</b><span>words of transcript form each query</span></div>
+    <div class="stat"><b>3–9</b><span>passages per real-time call</span></div>
+    <div class="stat"><b>60–73</b><span>grounding chunks per comprehensive call</span></div>
+    <div class="stat"><b>2.0 s</b><span>median time to a card</span></div>
+  </div>
+</section>
+
+<h2><span class="n">01</span>Where retrieval happens</h2>
+<p class="lead">Retrieval runs in three places, using two mechanisms: the backend searches the datastores itself for the real-time path, and Gemini searches them through grounding tools for the deeper paths.</p>
+
+<div class="pipe">
+<svg viewBox="0 0 1040 250" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Inter, Arial" font-size="13">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#37e6ff"/></marker>
+    <filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <g stroke="#22305a" stroke-width="1"><rect x="20" y="95" width="130" height="60" rx="12" fill="#101a33"/><rect x="200" y="95" width="150" height="60" rx="12" fill="#101a33"/><rect x="400" y="95" width="150" height="60" rx="12" fill="#101a33"/></g>
+  <text x="85" y="120" fill="#fff" text-anchor="middle" font-weight="600">Speech</text><text x="85" y="138" fill="#9aa8c7" text-anchor="middle">therapist + client</text>
+  <text x="275" y="120" fill="#fff" text-anchor="middle" font-weight="600">Speech-to-Text v2</text><text x="275" y="138" fill="#9aa8c7" text-anchor="middle">streaming, diarized</text>
+  <text x="475" y="120" fill="#fff" text-anchor="middle" font-weight="600">Transcript</text><text x="475" y="138" fill="#9aa8c7" text-anchor="middle">final lines, last 5 min</text>
+  <line x1="150" y1="125" x2="198" y2="125" stroke="#37e6ff" stroke-width="2" marker-end="url(#ar)"/>
+  <line x1="350" y1="125" x2="398" y2="125" stroke="#37e6ff" stroke-width="2" marker-end="url(#ar)"/>
+  <path d="M550 125 C600 125, 600 40, 640 40" fill="none" stroke="#37e6ff" stroke-width="2" marker-end="url(#ar)"/>
+  <path d="M550 125 L640 125" fill="none" stroke="#9b7bff" stroke-width="2" marker-end="url(#ar)"/>
+  <path d="M550 125 C600 125, 600 210, 640 210" fill="none" stroke="#4ef0b8" stroke-width="2" marker-end="url(#ar)"/>
+  <g filter="url(#glow)">
+    <rect x="642" y="14" width="200" height="52" rx="12" fill="#101a33" stroke="#37e6ff"/>
+    <rect x="642" y="99" width="200" height="52" rx="12" fill="#101a33" stroke="#9b7bff"/>
+    <rect x="642" y="184" width="200" height="52" rx="12" fill="#101a33" stroke="#4ef0b8"/>
+  </g>
+  <text x="742" y="35" fill="#37e6ff" text-anchor="middle" font-weight="600">Real-time · every ~8 words</text><text x="742" y="53" fill="#9aa8c7" text-anchor="middle">server-side search → gemini-2.5-flash</text>
+  <text x="742" y="120" fill="#9b7bff" text-anchor="middle" font-weight="600">Comprehensive · every ~8 words</text><text x="742" y="138" fill="#9aa8c7" text-anchor="middle">grounding tools → gemini-2.5-pro</text>
+  <text x="742" y="205" fill="#4ef0b8" text-anchor="middle" font-weight="600">Summary · session end</text><text x="742" y="223" fill="#9aa8c7" text-anchor="middle">grounding tools → gemini-2.5-pro</text>
+  <line x1="842" y1="40" x2="890" y2="40" stroke="#37e6ff" stroke-width="2" marker-end="url(#ar)"/>
+  <line x1="842" y1="125" x2="890" y2="125" stroke="#9b7bff" stroke-width="2" marker-end="url(#ar)"/>
+  <line x1="842" y1="210" x2="890" y2="210" stroke="#4ef0b8" stroke-width="2" marker-end="url(#ar)"/>
+  <rect x="892" y="14" width="130" height="52" rx="12" fill="#0c1327" stroke="#22305a"/><text x="957" y="35" fill="#fff" text-anchor="middle" font-weight="600">Alert card</text><text x="957" y="53" fill="#9aa8c7" text-anchor="middle">1.5–2.5 s</text>
+  <rect x="892" y="99" width="130" height="52" rx="12" fill="#0c1327" stroke="#22305a"/><text x="957" y="120" fill="#fff" text-anchor="middle" font-weight="600">Metrics, pathway</text><text x="957" y="138" fill="#9aa8c7" text-anchor="middle">30–50 s</text>
+  <rect x="892" y="184" width="130" height="52" rx="12" fill="#0c1327" stroke="#22305a"/><text x="957" y="205" fill="#fff" text-anchor="middle" font-weight="600">Summary + citations</text><text x="957" y="223" fill="#9aa8c7" text-anchor="middle">40–110 s</text>
+</svg>
+<div class="cap">Words become a transcript; the transcript drives three retrieval-backed calls; only the model outputs on the right reach the therapist.</div>
+</div>
+
 <table>
-<thead>
-<tr>
-<th>Path</th>
-<th>When it runs</th>
-<th>Model</th>
-<th>Retrieval mechanism</th>
-<th>Corpora consulted</th>
-<th>Typical latency</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Real-time guidance</td>
-<td>Every ~8 new transcript words (or 20 s after the first words)</td>
-<td>gemini-2.5-flash, thinking off</td>
-<td>Server-side search of Vertex AI Search (Discovery Engine) datastores; passages injected into the prompt as text</td>
-<td>ebt-corpus, safety-crisis + the session's modality corpora</td>
-<td>1.5–2.5 s</td>
-</tr>
-<tr>
-<td>Comprehensive analysis</td>
-<td>Same trigger, but only one in flight at a time</td>
-<td>gemini-2.5-pro, thinking budget 8,192 (16,384 if safety words found)</td>
-<td>Vertex AI Search attached to Gemini as grounding tools; Gemini queries and cites</td>
-<td>Same + transcript-patterns</td>
-<td>30–50 s</td>
-</tr>
-<tr>
-<td>Session summary</td>
-<td>When the therapist ends the session</td>
-<td>gemini-2.5-pro, thinking budget 24,576</td>
-<td>Grounding tools, as above</td>
-<td>Same as real-time</td>
-<td>40–110 s</td>
-</tr>
-</tbody>
+<tr><th>Path</th><th>When</th><th>Model</th><th>Retrieval mechanism</th><th>Corpora</th><th>Latency</th></tr>
+<tr><td>Real-time guidance</td><td>Every ≥8 new transcript words (or 20 s after first words)</td><td><code>gemini-2.5-flash</code>, thinking off</td><td>Backend searches Vertex AI Search datastores; passages injected into the prompt as text</td><td>ebt-corpus, safety-crisis + modality corpora</td><td>1.5–2.5 s</td></tr>
+<tr><td>Comprehensive analysis</td><td>Same trigger; one in flight at a time</td><td><code>gemini-2.5-pro</code>, thinking 8,192 (16,384 on safety hit)</td><td>Datastores attached as grounding tools; Gemini queries and cites</td><td>Same + transcript-patterns</td><td>30–50 s</td></tr>
+<tr><td>Session summary</td><td>Therapist ends the session</td><td><code>gemini-2.5-pro</code>, thinking 24,576</td><td>Grounding tools</td><td>Same as real-time</td><td>40–110 s</td></tr>
 </table>
-<p>The two mechanisms differ in who runs the search. In the real-time path the backend (<code>backend/therapy-analysis-function/main.py</code>, <code>prefetch_rag_context</code>) searches the datastores itself, formats the hits as a <code>CLINICAL EVIDENCE</code> block, and puts that block at the top of the prompt. In the comprehensive and summary paths the datastores are attached to the Gemini call as tools (<code>get_rag_tools_for_session</code>), so Gemini decides what to look up and returns grounding chunks that become citations.</p>
-<pre><code>Speech → Speech-to-Text v2 → Transcript
-   ├─ every ~8 words → Real-time: prefetch search → gemini-2.5-flash → Alert card
-   ├─ every ~8 words → Comprehensive: grounding tools → gemini-2.5-pro → metrics, pathway
-   └─ session end   → Summary: grounding tools → gemini-2.5-pro → summary + citations
-</code></pre>
-<h2>2. The corpora</h2>
-<p>Nine Vertex AI Search datastores live in project <code>brk-prj-salvador-dura-bern-sbx</code> (location <code>us</code>); seven are wired into the app, and two of those are consulted on every call regardless of modality. Counts are live as of 2026-09-23.</p>
+<p>Real-time: <code>backend/therapy-analysis-function/main.py</code> → <code>prefetch_rag_context</code> builds a <code>CLINICAL EVIDENCE</code> block and puts it at the top of the prompt. Comprehensive and summary: <code>get_rag_tools_for_session</code> attaches <code>types.Tool(retrieval=VertexAISearch(datastore=…))</code> objects to the call, and Gemini returns grounding chunks that become citations.</p>
+
+<h2><span class="n">02</span>The corpora</h2>
+<p class="lead">Nine Vertex AI Search datastores in location <code>us</code>; seven are wired into the app; two of those are consulted on every call regardless of modality. Counts are live as of 2026-09-23.</p>
 <table>
-<thead>
-<tr>
-<th>Datastore</th>
-<th>Display name</th>
-<th>Documents</th>
-<th>Source bucket</th>
-<th>Used by</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>ebt-corpus</code></td>
-<td>EBT Therapy Manuals Corpus</td>
-<td>94</td>
-<td><code>…-ebt-corpus</code> (103 MB)</td>
-<td>Every call (core protocols)</td>
-</tr>
-<tr>
-<td><code>safety-crisis</code></td>
-<td>Safety &amp; Crisis Clinical Protocols</td>
-<td>9</td>
-<td><code>…-safety-crisis</code> (7.5 MB)</td>
-<td>Every call</td>
-</tr>
-<tr>
-<td><code>cbt-corpus</code></td>
-<td>CBT Clinical Research Papers</td>
-<td>196</td>
-<td><code>…-cbt-material</code> (116 MB)</td>
-<td>CBT sessions</td>
-</tr>
-<tr>
-<td><code>ba-corpus</code></td>
-<td>BA Corpus</td>
-<td>76</td>
-<td><code>…-ba-corpus</code> (34 MB)</td>
-<td>CBT sessions (behavioral activation)</td>
-</tr>
-<tr>
-<td><code>dbt-corpus</code></td>
-<td>DBT Corpus</td>
-<td>6</td>
-<td><code>…-dbt-corpus</code> (7 MB)</td>
-<td>DBT sessions</td>
-</tr>
-<tr>
-<td><code>ipt-corpus</code></td>
-<td>IPT Corpus</td>
-<td>75</td>
-<td><code>…-ipt-corpus</code> (38 MB)</td>
-<td>IPT sessions</td>
-</tr>
-<tr>
-<td><code>transcript-patterns</code></td>
-<td>Clinical Therapy Transcripts</td>
-<td>3,000</td>
-<td><code>…-transcript-patterns</code> (67 MB)</td>
-<td>Comprehensive analysis only</td>
-</tr>
-<tr>
-<td><code>mi-corpus</code></td>
-<td>Motivational Interviewing Clinical Corpus</td>
-<td>1</td>
-<td><code>…-mi-corpus</code></td>
-<td>Not wired in</td>
-</tr>
-<tr>
-<td><code>trauma-corpus</code></td>
-<td>Trauma-Informed Care Clinical Corpus</td>
-<td>5</td>
-<td><code>…-trauma-corpus</code> (5.8 MB)</td>
-<td>Not wired in</td>
-</tr>
-</tbody>
+<tr><th>Datastore</th><th>Display name</th><th>Docs</th><th>Chunking</th><th>Source bucket</th><th>Used by</th></tr>
+<tr><td><code>ebt-corpus</code></td><td>EBT Therapy Manuals Corpus</td><td>94</td><td>layout, 500 tokens</td><td>…-ebt-corpus (103 MB)</td><td>Every call</td></tr>
+<tr><td><code>safety-crisis</code></td><td>Safety &amp; Crisis Clinical Protocols</td><td>9</td><td>layout, 400 tokens</td><td>…-safety-crisis (7.5 MB)</td><td>Every call</td></tr>
+<tr><td><code>cbt-corpus</code></td><td>CBT Clinical Research Papers</td><td>196</td><td>layout, 500 tokens</td><td>…-cbt-material (116 MB)</td><td>CBT sessions</td></tr>
+<tr><td><code>ba-corpus</code></td><td>BA Corpus</td><td>76</td><td>layout, default</td><td>…-ba-corpus (34 MB)</td><td>CBT sessions</td></tr>
+<tr><td><code>dbt-corpus</code></td><td>DBT Corpus</td><td>6</td><td>layout, default</td><td>…-dbt-corpus (7 MB)</td><td>DBT sessions</td></tr>
+<tr><td><code>ipt-corpus</code></td><td>IPT Corpus</td><td>75</td><td>layout, default</td><td>…-ipt-corpus (38 MB)</td><td>IPT sessions</td></tr>
+<tr><td><code>transcript-patterns</code></td><td>Clinical Therapy Transcripts</td><td>3,000</td><td>layout, 300 tokens</td><td>…-transcript-patterns (67 MB)</td><td>Comprehensive only</td></tr>
+<tr><td><code>mi-corpus</code></td><td>Motivational Interviewing Clinical Corpus</td><td>1</td><td>layout, 500 tokens</td><td>…-mi-corpus</td><td>Not wired in</td></tr>
+<tr><td><code>trauma-corpus</code></td><td>Trauma-Informed Care Clinical Corpus</td><td>5</td><td>layout, 500 tokens</td><td>…-trauma-corpus (5.8 MB)</td><td>Not wired in</td></tr>
 </table>
-<p>Routing is a fixed map in <code>main.py</code> (<code>modality_map</code>, line 580, and <code>MODALITY_RAG_MAP</code> for the tool path): CBT → <code>cbt-corpus</code> + <code>ba-corpus</code>; DBT → <code>dbt-corpus</code>; IPT → <code>ipt-corpus</code>; an unknown modality falls back to CBT. The safety datastore contains the 988 Lifeline risk-assessment standards and crisis protocols; <code>transcript-patterns</code> holds de-identified session excerpts that the comprehensive analysis uses to recognise process patterns such as ruptures and avoidance. Documents are parsed PDFs and text, indexed for search (<code>SOLUTION_TYPE_SEARCH</code>, standard edition, so snippets only, no extractive answers).</p>
-<h2>3. Triggers: what starts a lookup and what is searched</h2>
-<p>A lookup is started by the transcript, not by a keyword: every time 8 or more new final-transcript words have accumulated, the frontend (<code>frontend/components/NewTherSession.tsx</code>, <code>WORDS_PER_ANALYSIS = 8</code>) sends the last 5 minutes of transcript to the backend, which retrieves before it reasons. If the word threshold has not been met 20 s after the first words, a time-based fallback fires once.</p>
-<ol>
-<li><strong>What is sent.</strong> The final (non-interim) transcript lines from the last 5 minutes, with speaker labels, plus the session context (modality, duration, the most recent alert for de-duplication) and a shared job id so the real-time and comprehensive results can be paired.</li>
-<li><strong>How the search query is built.</strong> The backend joins the transcript text and uses its <strong>last ~200 words</strong> as the search query (<code>prefetch_rag_context</code>, line 586). There is no keyword extraction: the patient's and therapist's own recent words are the query, so a turn about "filling out the activity log" pulls behavioral-activation passages and a turn about nightmares pulls trauma and sleep material.</li>
-<li><strong>Which shelves.</strong> <code>ebt-corpus</code> and <code>safety-crisis</code> always, plus the modality's corpora (CBT: <code>cbt-corpus</code>, <code>ba-corpus</code>). The four datastores are searched in parallel threads with a 10 s cap each, and results are cached for 25 s keyed on the modality and a hash of the last 500 characters, so a burst of triggers does not re-query identical text.</li>
-<li><strong>Safety keyword scanner (deterministic, runs before the model).</strong> <code>detect_safety_keywords</code> matches the transcript against five hard-coded lists in <code>constants.py</code>: suicidal ideation (19 terms, e.g. "suicide", "kill myself", "end my life"), self-harm (14, e.g. "cutting myself"), violence/homicide (22, e.g. "kill him"), abuse disclosure (22, e.g. "hitting me"), substance crisis (17, e.g. "overdose", "relapsed"). A match forces a safety alert whatever the model says, injects a <code>SAFETY KEYWORDS DETECTED</code> block naming the matched terms into the prompt, and raises the comprehensive model's thinking budget from 8,192 to 16,384 tokens.</li>
-<li><strong>Trigger phrases.</strong> Four demo phrases ("something else came up", "scared but I want to do it", "very brave", "I might fall apart") switch the real-time prompt from its strict variant to a non-strict one that allows a process-level suggestion; they do not change what is retrieved.</li>
-</ol>
-<p>What does not trigger retrieval: interim (partial) transcript lines, clinician notes, and anything typed into the UI. Retrieval is driven only by spoken words that Speech-to-Text has finalised.</p>
-<h2>4. The real-time path, step by step</h2>
-<p>A real-time alert takes 1.3–2.5 s end to end, of which 0.3–1.2 s is retrieval; the model never sees the transcript without the retrieved passages in front of it.</p>
-<pre><code>Frontend ──analyze_segment (last 5 min, is_realtime=true)──▶ therapy-analysis
-therapy-analysis ── safety keyword scan
-therapy-analysis ──search ×4 datastores (last ~200 words)──▶ Vertex AI Search
-Vertex AI Search ──3–9 snippets + source titles──▶ therapy-analysis
-therapy-analysis ──prompt = safety block + CLINICAL EVIDENCE + transcript──▶ gemini-2.5-flash
-gemini-2.5-flash ──alert JSON (streamed)──▶ therapy-analysis ──alert + diagnostics──▶ Frontend
-</code></pre>
-<ol>
-<li><strong>Retrieve.</strong> <code>prefetch_rag_context</code> searches each datastore with <code>SearchRequest(page_size=3, snippet_spec=return_snippet)</code>, keeps the snippet text and the document title as <code>[Source: &lt;title&gt;]</code>, caps at 6 passages per store, and joins them into one <code>CLINICAL EVIDENCE</code> block. Observed in the Jane Doe run: 3–9 passages per call, 292–1,232 ms.</li>
-<li><strong>Assemble the prompt.</strong> Order is fixed: an optional <code>SAFETY KEYWORDS DETECTED</code> block, then the <code>CLINICAL EVIDENCE (from evidence-based therapy corpus — use these to ground your guidance)</code> block, then <code>REALTIME_ANALYSIS_PROMPT</code> with the transcript, session phase and the previous alert (for de-duplication).</li>
-<li><strong>Generate.</strong> <code>gemini-2.5-flash</code>, <code>temperature 0.0</code>, <code>max_output_tokens 1024</code>, <code>thinking_budget 0</code> (set explicitly on 2026-09-18; before that dynamic thinking consumed up to 979 of the 1,024 tokens and alerts arrived title-only). No tools are attached on this path, which is what keeps it under 3 s.</li>
-<li><strong>Parse.</strong> The streamed text is parsed as JSON (<code>{alert: {timing, category, title, message, evidence[], recommendation[]}}</code>) with a repair pass for truncated output; <code>_diagnostics</code> records latency, tokens, <code>rag_tools</code> consulted and <code>grounding.chunks_retrieved</code> (0 on this path, because passages were injected as text rather than returned as grounding metadata).</li>
-<li><strong>Display.</strong> The frontend de-duplicates against recent alerts (Jaccard similarity on title and message, 3 s hard block, per-category throttles) and shows the card.</li>
-</ol>
-<p>Measured on 2026-09-23, local stack and Cloud Run: median 2.0 s, max 3.5 s per alert; 23 of 23 real-time calls retrieved passages; 0 truncations.</p>
-<h2>5. The comprehensive and summary paths</h2>
-<p>These two paths let Gemini search the corpus itself: the datastores are attached to the call as Vertex AI Search grounding tools, the model issues its own queries while reasoning, and every passage it relies on comes back as a grounding chunk that becomes a citation.</p>
-<table>
-<thead>
-<tr>
-<th>Aspect</th>
-<th>Comprehensive analysis</th>
-<th>Session summary</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Trigger</td>
-<td>Same word trigger as real-time; skipped while one is in flight</td>
-<td>Therapist ends the session</td>
-</tr>
-<tr>
-<td>Model</td>
-<td><code>gemini-2.5-pro</code></td>
-<td><code>gemini-2.5-pro</code></td>
-</tr>
-<tr>
-<td>Thinking budget</td>
-<td>8,192 tokens; 16,384 when the safety scanner fired</td>
-<td>24,576 tokens</td>
-</tr>
-<tr>
-<td>Max output</td>
-<td>2,560 tokens</td>
-<td>4,096 tokens</td>
-</tr>
-<tr>
-<td>Tools</td>
-<td><code>ebt-corpus</code>, <code>safety-crisis</code>, modality corpora, <code>transcript-patterns</code></td>
-<td><code>ebt-corpus</code>, <code>safety-crisis</code>, modality corpora</td>
-</tr>
-<tr>
-<td>Output</td>
-<td>session metrics (engagement, alliance, emotional state, arousal), pathway indicators, modality suggestion, diarized transcript</td>
-<td>key moments with timestamps, techniques used, risk assessment, homework, follow-ups, citations</td>
-</tr>
-<tr>
-<td>Grounding seen today</td>
-<td>60–73 chunks per call</td>
-<td>9 citations on the Jane Doe summary</td>
-</tr>
-<tr>
-<td>Latency seen today</td>
-<td>34–50 s</td>
-<td>40–110 s</td>
-</tr>
-</tbody>
-</table>
-<p>The tools are built once at start-up (<code>MANUAL_RAG_TOOL</code>, <code>SAFETY_RAG_TOOL</code>, <code>CBT_RAG_TOOL</code>, <code>BA_RAG_TOOL</code>, <code>DBT_RAG_TOOL</code>, <code>IPT_RAG_TOOL</code>, <code>TRANSCRIPT_RAG_TOOL</code>, each a <code>types.Tool(retrieval=VertexAISearch(datastore=…))</code>) and selected per session by <code>get_rag_tools_for_session</code>. Grounding chunks carry the source document and the retrieved text; the backend copies them into <code>citations[]</code> on the summary (title + source excerpt), which is why a summary response is ~143 KB, of which ~133 KB is citation text. The comprehensive path also uses a cached system prompt (context caching) to cut input cost; the cache is keyed to the pro model and refreshed on expiry.</p>
-<h2>6. Worked example from the Jane Doe session (2026-09-23, local run)</h2>
-<p>One real-time cycle, taken from <code>error-log-analysis.txt</code>, shows the whole chain from spoken words to a card in about 2.6 s.</p>
-<ol>
-<li><strong>Spoken.</strong> Speech-to-Text finalised this stretch of the synthetic session: "…let's start with the homework. Can you tell me a bit about how it went filling out that activity log? … those couple of hours on Saturday. Was that when you were planning to try baking those cookies for your sister? Yeah, it was, I actually did it, she came over…"</li>
-<li><strong>Triggered.</strong> The frontend had accumulated more than 8 new words, so it sent the last 5 minutes of transcript (<code>realtime: True</code>, CBT, job id shared with the comprehensive call).</li>
-<li><strong>Scanned.</strong> <code>detect_safety_keywords</code> found none of the 94 safety terms; no safety block was injected, prompt variant <code>strict</code>.</li>
-<li><strong>Retrieved.</strong> <code>[RAG PREFETCH] Querying 4 datastores for CBT: ['ebt-corpus', 'safety-crisis', 'cbt-corpus', 'ba-corpus']</code> with the last ~200 words as the query; <code>Completed in 548 ms — 9 passages retrieved</code>. The passages came back with source titles from the BA and CBT research corpora (activity scheduling, reinforcing completed activities, the discounting-positives distortion).</li>
-<li><strong>Generated.</strong> <code>gemini-2.5-flash</code> read the <code>CLINICAL EVIDENCE</code> block plus the transcript: <code>latency 2,048 ms</code>, 2,413 prompt tokens, 275 output tokens, finish <code>STOP</code>.</li>
-<li><strong>Shown.</strong> The card that appeared in the session was <strong>"Behavioral Activation Opportunity" (technique)</strong>, recommending that the therapist reinforce the completed activity and connect it to Jane's sense of competence, alongside earlier cards such as "Addressing Sleep Disturbances and Nightmares" and "Tracking Mood Progress". The comprehensive call for the same job id ran with the grounding tools and reported 60–62 grounding chunks.</li>
-</ol>
-<p>The same session, played on the deployed Cloud Run service (<code>ther-assist-sidecar</code>), produced identical log signatures: 4 datastores per call, 3–8 passages, 73 grounding chunks on the comprehensive path.</p>
-<h2>7. Verifying that RAG is active, and what can go wrong</h2>
-<p>RAG is verified from the analysis log, never from the screen: a session can look normal while retrieval silently returns nothing, which is exactly what happened before 2026-09-18.</p>
-<table>
-<thead>
-<tr>
-<th>Log line (<code>error-log-analysis.txt</code> locally, Cloud Run logs for <code>ther-assist-sidecar</code> online)</th>
-<th>Healthy</th>
-<th>Broken</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>[RAG PREFETCH] Querying 4 datastores for CBT: [...]</code></td>
-<td>one per real-time call</td>
-<td>missing = retrieval not attempted</td>
-</tr>
-<tr>
-<td><code>[RAG PREFETCH] Completed in &lt;ms&gt; — N passages retrieved</code></td>
-<td>N ≥ 3</td>
-<td>N = 0 on every call</td>
-</tr>
-<tr>
-<td><code>[RAG PREFETCH] Failed to query &lt;datastore&gt;: ...</code></td>
-<td>absent</td>
-<td>present (2026-09-18: <code>400 Cannot use enterprise edition features</code>)</td>
-</tr>
-<tr>
-<td><code>[RAG] Session type 'CBT' → tools: ebt-corpus + safety-crisis + ...</code></td>
-<td>one per comprehensive call</td>
-<td>missing</td>
-</tr>
-<tr>
-<td><code>Found N grounding chunks</code></td>
-<td>N ≥ 20 on comprehensive calls</td>
-<td>0</td>
-</tr>
-<tr>
-<td><code>Added N citations to session summary response</code></td>
-<td>N ≥ 1</td>
-<td>0</td>
-</tr>
-</tbody>
-</table>
-<p>Failure modes seen so far:</p>
-<ul>
-<li><strong>Enterprise-only request on a standard datastore (fixed 2026-09-18).</strong> <code>_query_datastore</code> asked for extractive answers; Discovery Engine rejected every call with 400, the <code>except</code> swallowed it as a warning, and real-time guidance ran ungrounded for months while looking fine. Snippets-only requests fixed it; the passage count went from 0 to 7–10 per call.</li>
-<li><strong>Thinking eating the output budget (fixed 2026-09-18).</strong> Not a retrieval bug, but it hid one: truncated alerts drew attention away from the empty evidence block.</li>
-<li><strong>Duplicate real-time requests (fixed 2026-09-18).</strong> Every trigger fired twice from a React state updater; 80 requests per test session became 41.</li>
-<li><strong>Storage service rejecting the placeholder token online (fixed 2026-09-23).</strong> The deployed frontend runs without Firebase and sends a placeholder token; the storage service rejected it, so the Example Audio buttons failed with 401 online. Inside Cloud Run the service now accepts requests that arrived through IAP (IAP forwards <code>X-Goog-IAP-JWT-Assertion</code>, not the email header).</li>
-<li><strong>Early "ended" from the browser's audio element (guarded 2026-09-23).</strong> Chrome fired <code>ended</code> 8:40 into an intact 32-minute MP3, which stopped the session; an <code>ended</code> more than 2 s before the known duration is now logged and playback resumes.</li>
-<li><strong><code>gcloud run services replace</code> switching IAP off (fixed 2026-09-23).</strong> The service YAML lacked the IAP annotation; it is now pinned in the spec.</li>
-<li><strong>Cache masking.</strong> Results are cached for 25 s per modality; a stale cache can show <code>Cache hit</code> lines with no new query, which is normal within a burst.</li>
-<li><strong>Service account permissions.</strong> The runtime account needs <code>roles/discoveryengine.viewer</code> (it has it) and network egress to <code>us-discoveryengine.googleapis.com</code>; a DNS race in the gRPC client was fixed in April by sharing one client.</li>
+<div class="grid">
+  <div class="card c-cyan"><h4>Routing map</h4><p><code>modality_map</code> in <code>main.py</code> line 580 (and <code>MODALITY_RAG_MAP</code> for the tool path): CBT → cbt-corpus + ba-corpus; DBT → dbt-corpus; IPT → ipt-corpus; unknown → CBT. ebt-corpus and safety-crisis are always added.</p></div>
+  <div class="card c-violet"><h4>How documents are chunked</h4><p>Vertex AI Search's layout parser reads each PDF, then layout-based chunking cuts it into 300–500-token chunks with the section's ancestor headings prepended, so every chunk carries its context.</p></div>
+  <div class="card c-mint"><h4>Standard edition = snippets</h4><p>The datastores are standard edition (<code>SOLUTION_TYPE_SEARCH</code>). Search returns snippets (a highlighted 1–3 sentence extract around the matching terms) plus metadata; extractive answers are an enterprise feature and requesting them returns 400.</p></div>
+</div>
+
+<h2><span class="n">03</span>What triggers a lookup, and what is searched</h2>
+<p class="lead">A lookup is started by the transcript, not by a keyword. The last ~200 words of what was said become the search query; the patient's own words do the looking up.</p>
+<ul class="timeline">
+  <li><b>Trigger.</b><span class="t">NewTherSession.tsx · WORDS_PER_ANALYSIS = 8</span><br>When ≥8 new final-transcript words have accumulated, the frontend sends the last 5 minutes of transcript (final lines only, speaker-labelled), the session context and a shared job id. If no trigger has fired 20 s after the first words, a time-based fallback fires once.</li>
+  <li><b>Query.</b><span class="t">main.py · prefetch_rag_context, line 586</span><br>The transcript text is joined and its last 200 words become the query. No keyword extraction, no rewriting.</li>
+  <li><b>Shelves.</b><span class="t">4 datastores in parallel · 10 s cap each · 25 s cache</span><br>ebt-corpus and safety-crisis always, plus the modality's corpora. Results are cached per modality, keyed on a hash of the last 500 characters.</li>
+  <li><b>Safety scanner.</b><span class="t">constants.py · SAFETY_KEYWORDS, 94 terms in 5 lists</span><br>Deterministic substring match before any model call: suicidal ideation (19), self-harm (14), violence/homicide (22), abuse disclosure (22), substance crisis (17). A hit forces <code>category=safety, timing=now</code>, injects the matched terms into the prompt and raises the comprehensive thinking budget to 16,384.</li>
+  <li><b>Trigger phrases.</b><span class="t">constants.py · TRIGGER_PHRASES</span><br>Four demo phrases ("something else came up", "scared but I want to do it", "very brave", "I might fall apart") switch the real-time prompt to its non-strict variant. They do not change what is retrieved.</li>
 </ul>
-<p>What is deliberately not retrieved: clinician notes, the patient record, prior sessions' transcripts, and anything typed into the UI. Configuration lives in <code>constants.py</code> (models, prompts, safety keyword lists, trigger phrases) and <code>main.py</code> (<code>modality_map</code>, <code>RAG_CACHE_TTL_SECONDS = 25</code>, per-datastore <code>page_size = 3</code>, 10 s search timeout). The hard rule for this project: both the local stack and the online deployment must always run through these datastores; a change that would bypass them is not acceptable, and every deploy is checked against the log lines above.</p>
-<hr />
-<h1>Engineering reference</h1>
-<p>Exact values as deployed on 2026-09-23.</p>
-<h2>How documents are parsed and chunked</h2>
-<p>Each datastore uses Vertex AI Search's layout parser (<code>defaultParsingConfig.layoutParsingConfig</code>) on the source PDFs and text, then layout-based chunking with the ancestor headings prepended to every chunk, so a passage carries its section context. Chunk size is in tokens.</p>
-<table>
-<thead>
-<tr>
-<th>Datastore</th>
-<th>Parser</th>
-<th>Chunk size (tokens)</th>
-<th>Ancestor headings</th>
-<th>Source</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>ebt-corpus</code></td>
-<td>layout</td>
-<td>500</td>
-<td>yes</td>
-<td>PDFs in <code>gs://…-ebt-corpus</code></td>
-</tr>
-<tr>
-<td><code>cbt-corpus</code></td>
-<td>layout</td>
-<td>500</td>
-<td>yes</td>
-<td>PDFs in <code>gs://…-cbt-material</code> (e.g. <code>CBT_103_PMC9840507.pdf</code>)</td>
-</tr>
-<tr>
-<td><code>safety-crisis</code></td>
-<td>layout</td>
-<td>400</td>
-<td>yes</td>
-<td>PDFs incl. <code>988_Lifeline_Suicide_Risk_Assessment_Standards</code></td>
-</tr>
-<tr>
-<td><code>transcript-patterns</code></td>
-<td>layout</td>
-<td>300</td>
-<td>yes</td>
-<td>transcript excerpts (<code>1-p10</code> style ids)</td>
-</tr>
-<tr>
-<td><code>mi-corpus</code>, <code>trauma-corpus</code></td>
-<td>layout</td>
-<td>500</td>
-<td>yes</td>
-<td>PMC papers</td>
-</tr>
-<tr>
-<td><code>ba-corpus</code>, <code>dbt-corpus</code>, <code>ipt-corpus</code></td>
-<td>layout</td>
-<td>service default</td>
-<td>default</td>
-<td>PDFs</td>
-</tr>
-</tbody>
-</table>
-<p>Documents are <code>CONTENT_REQUIRED</code>, industry vertical <code>GENERIC</code>, solution <code>SOLUTION_TYPE_SEARCH</code>, standard edition. Standard edition returns <strong>snippets</strong> (a short highlighted extract around the matching terms, typically 1–3 sentences) and document metadata; it does not return extractive answers or segments, which is why the 2026-09-18 request for them failed with 400.</p>
-<h2>Real-time retrieval, exact parameters</h2>
-<table>
-<thead>
-<tr>
-<th>Parameter</th>
-<th>Value</th>
-<th>Where</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Trigger</td>
-<td>≥ 8 new final words, or 20 s after first words</td>
-<td><code>frontend/components/NewTherSession.tsx</code> (<code>WORDS_PER_ANALYSIS</code>)</td>
-</tr>
-<tr>
-<td>Transcript window sent</td>
-<td>last 5 minutes, final lines only, speaker-labelled</td>
-<td>same</td>
-</tr>
-<tr>
-<td>Search query</td>
-<td>last 200 words of the joined transcript text</td>
-<td><code>main.py</code> <code>prefetch_rag_context</code></td>
-</tr>
-<tr>
-<td>Datastores</td>
-<td><code>ebt-corpus</code>, <code>safety-crisis</code> + <code>modality_map[session_type]</code> (CBT → <code>cbt-corpus</code>, <code>ba-corpus</code>)</td>
-<td><code>main.py</code> line 580</td>
-</tr>
-<tr>
-<td>Per-datastore request</td>
-<td><code>SearchRequest(page_size=3, snippet_spec.return_snippet=True)</code></td>
-<td><code>_query_datastore</code></td>
-</tr>
-<tr>
-<td>Passages kept per datastore</td>
-<td>snippets + <code>[Source: &lt;title&gt;]</code> lines, capped at 6</td>
-<td><code>_query_datastore</code></td>
-</tr>
-<tr>
-<td>Parallelism / timeout</td>
-<td>one thread per datastore, <code>join(timeout=10)</code></td>
-<td><code>prefetch_rag_context</code></td>
-</tr>
-<tr>
-<td>Cache</td>
-<td>25 s per modality, keyed on hash of last 500 chars</td>
-<td><code>RAG_CACHE_TTL_SECONDS</code></td>
-</tr>
-<tr>
-<td>Endpoint</td>
-<td><code>us-discoveryengine.googleapis.com</code>, location <code>us</code>, serving config <code>default_search</code></td>
-<td><code>_search_client</code></td>
-</tr>
-<tr>
-<td>Model</td>
-<td><code>gemini-2.5-flash</code>, <code>temperature=0.0</code>, <code>max_output_tokens=1024</code>, <code>thinking_budget=0</code></td>
-<td><code>handle_realtime_analysis_with_retry</code></td>
-</tr>
-</tbody>
-</table>
-<p>The evidence block is assembled as:</p>
-<pre><code class="language-text">--- Evidence from cbt-corpus ---
+<p>What never triggers retrieval: interim (partial) transcript lines, clinician notes, and anything typed in the UI.</p>
+
+<h2><span class="n">04</span>The real-time path, step by step</h2>
+<p class="lead">1.3–2.5 s end to end, of which 0.3–1.2 s is retrieval. The model never sees the transcript without the retrieved passages in front of it.</p>
+<div class="pipe">
+<svg viewBox="0 0 1040 200" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Inter, Arial" font-size="12.5">
+  <defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#9b7bff"/></marker></defs>
+  <g fill="#101a33" stroke="#22305a"><rect x="20" y="20" width="140" height="160" rx="12"/><rect x="250" y="20" width="200" height="160" rx="12"/><rect x="540" y="20" width="200" height="160" rx="12"/><rect x="830" y="20" width="190" height="160" rx="12"/></g>
+  <text x="90" y="45" fill="#fff" text-anchor="middle" font-weight="600">Frontend</text>
+  <text x="350" y="45" fill="#fff" text-anchor="middle" font-weight="600">therapy-analysis</text>
+  <text x="640" y="45" fill="#fff" text-anchor="middle" font-weight="600">Vertex AI Search</text>
+  <text x="925" y="45" fill="#fff" text-anchor="middle" font-weight="600">gemini-2.5-flash</text>
+  <line x1="160" y1="75" x2="248" y2="75" stroke="#9b7bff" stroke-width="2" marker-end="url(#ar2)"/><text x="204" y="68" fill="#9aa8c7" text-anchor="middle">analyze_segment</text>
+  <text x="350" y="80" fill="#ffc857" text-anchor="middle">① safety keyword scan</text>
+  <line x1="450" y1="105" x2="538" y2="105" stroke="#9b7bff" stroke-width="2" marker-end="url(#ar2)"/><text x="494" y="98" fill="#9aa8c7" text-anchor="middle">② search ×4</text>
+  <line x1="538" y1="135" x2="452" y2="135" stroke="#4ef0b8" stroke-width="2" marker-end="url(#ar2)"/><text x="494" y="150" fill="#9aa8c7" text-anchor="middle">③ 3–9 snippets</text>
+  <text x="640" y="110" fill="#9aa8c7" text-anchor="middle">page_size 3 · snippets</text><text x="640" y="128" fill="#9aa8c7" text-anchor="middle">4 shelves, parallel</text>
+  <line x1="740" y1="90" x2="828" y2="90" stroke="#9b7bff" stroke-width="2" marker-end="url(#ar2)"/><text x="784" y="83" fill="#9aa8c7" text-anchor="middle">④ prompt</text>
+  <line x1="828" y1="140" x2="742" y2="140" stroke="#4ef0b8" stroke-width="2" marker-end="url(#ar2)"/><text x="784" y="156" fill="#9aa8c7" text-anchor="middle">⑤ alert JSON</text>
+  <text x="925" y="100" fill="#9aa8c7" text-anchor="middle">temperature 0.0</text><text x="925" y="118" fill="#9aa8c7" text-anchor="middle">max 1024 tokens</text><text x="925" y="136" fill="#9aa8c7" text-anchor="middle">thinking_budget 0</text>
+  <line x1="248" y1="165" x2="162" y2="165" stroke="#4ef0b8" stroke-width="2" marker-end="url(#ar2)"/><text x="204" y="180" fill="#9aa8c7" text-anchor="middle">⑥ card + diagnostics</text>
+</svg>
+<div class="cap">The prompt is assembled as safety block (if any) → CLINICAL EVIDENCE block → REALTIME_ANALYSIS_PROMPT with transcript, phase and the previous alert for de-duplication.</div>
+</div>
+<pre><code>--- Evidence from cbt-corpus ---
 [cbt-corpus:1] &lt;snippet text&gt;
 [cbt-corpus:2] &lt;snippet text&gt;
 [cbt-corpus:3] [Source: Cognitive-behavioral therapy for anxiety disorders: an update]
 --- Evidence from ba-corpus ---
-[ba-corpus:1] &lt;snippet text&gt;
-</code></pre>
-<p>and the prompt is <code>safety_prefix + "CLINICAL EVIDENCE (from evidence-based therapy corpus — use these to ground your guidance):" + evidence + REALTIME_ANALYSIS_PROMPT</code>. The template (<code>constants.py</code>, 3,887 characters) contains the transcript, the previous alert for de-duplication, the timing rules (NOW / PAUSE / INFO), the category list and the safety instructions (duty to warn, mandatory reporting, crisis resources).</p>
-<h2>Alert JSON schema (model output, real-time)</h2>
-<pre><code class="language-json">{
-  &quot;alert&quot;: {
-    &quot;timing&quot;: &quot;now | pause | info&quot;,
-    &quot;category&quot;: &quot;safety | technique | pathway_change | engagement | process&quot;,
-    &quot;title&quot;: &quot;Brief descriptive title&quot;,
-    &quot;message&quot;: &quot;Specific action or observation (1-3 sentences)&quot;,
-    &quot;evidence&quot;: [&quot;quote(s) from the patient&quot;],
-    &quot;recommendation&quot;: [&quot;up to 3 actions&quot;],
-    &quot;immediateActions&quot;: [&quot;step to take right now&quot;],
-    &quot;contraindications&quot;: [&quot;what to avoid&quot;],
-    &quot;crisis_resources&quot;: [&quot;required for safety alerts, e.g. 988 Suicide &amp; Crisis Lifeline&quot;]
-  }
-}
-</code></pre>
-<p>The backend adds <code>timestamp</code>, <code>session_phase</code>, <code>analysis_type</code>, <code>prompt_used</code> (<code>strict</code> / <code>non-strict</code>), <code>trigger_phrase_detected</code>, <code>safety_keywords_detected</code>, <code>job_id</code> and <code>_diagnostics</code> (model, latency_ms, ttft_ms, token_usage incl. thinking tokens, finish_reason, rag_tools, grounding.chunks_retrieved, json_parse_success, used_fallback).</p>
-<h2>Safety keyword scanner (<code>constants.py</code>, <code>SAFETY_KEYWORDS</code>, lines 35–78)</h2>
-<p>Case-insensitive substring match over the whole transcript segment, before any model call. A hit forces <code>category=safety, timing=now</code>, injects the matched terms into the prompt, and raises the comprehensive thinking budget to 16,384.</p>
+[ba-corpus:1] &lt;snippet text&gt;</code></pre>
 <table>
-<thead>
-<tr>
-<th>Category</th>
-<th>Terms</th>
-<th>Examples</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>suicidal_ideation</td>
-<td>19</td>
-<td>suicide, suicidal, kill myself, end my life, don't want to live, nothing to live for</td>
-</tr>
-<tr>
-<td>self_harm</td>
-<td>14</td>
-<td>self-harm, cutting myself, hurt myself, burning myself, razor, blade on my skin, punching walls</td>
-</tr>
-<tr>
-<td>violence_homicide</td>
-<td>22</td>
-<td>kill him/her/them, hurt them, homicidal, violent urges, weapon, gun, knife, shoot, stab, want them dead</td>
-</tr>
-<tr>
-<td>abuse_disclosure</td>
-<td>22</td>
-<td>hitting me, beating me, abusing me, molested, raped, domestic violence, child abuse, elder abuse, being trafficked</td>
-</tr>
-<tr>
-<td>substance_crisis</td>
-<td>17</td>
-<td>overdose, took too many pills, relapsed, using again, withdrawal</td>
-</tr>
-</tbody>
+<tr><th>Parameter</th><th>Value</th><th>Where</th></tr>
+<tr><td>Per-datastore request</td><td><code>SearchRequest(page_size=3, snippet_spec.return_snippet=True)</code></td><td><code>_query_datastore</code></td></tr>
+<tr><td>Passages kept</td><td>snippets + <code>[Source: &lt;title&gt;]</code>, capped at 6 per datastore</td><td><code>_query_datastore</code></td></tr>
+<tr><td>Parallelism / timeout</td><td>one thread per datastore, <code>join(timeout=10)</code></td><td><code>prefetch_rag_context</code></td></tr>
+<tr><td>Cache</td><td>25 s per modality, keyed on hash of last 500 chars</td><td><code>RAG_CACHE_TTL_SECONDS</code></td></tr>
+<tr><td>Endpoint</td><td><code>us-discoveryengine.googleapis.com</code>, serving config <code>default_search</code></td><td><code>_search_client</code></td></tr>
+<tr><td>Model call</td><td><code>gemini-2.5-flash</code>, temperature 0.0, max_output_tokens 1024, <code>thinking_budget=0</code> (set 2026-09-18; before that dynamic thinking ate up to 979 of 1,024 tokens)</td><td><code>handle_realtime_analysis_with_retry</code></td></tr>
 </table>
-<p>Trigger phrases (<code>TRIGGER_PHRASES</code>, four demo phrases: "something else came up", "scared but I want to do it", "very brave", "I might fall apart") only switch the real-time prompt to its non-strict variant.</p>
-<h2>Comprehensive and summary tools</h2>
-<p><code>types.Tool(retrieval=types.Retrieval(vertex_ai_search=types.VertexAISearch(datastore="projects/…/locations/us/collections/default_collection/dataStores/&lt;id&gt;")))</code>, one per datastore, built at import time. Selection: <code>get_rag_tools_for_session(session_context, is_realtime)</code>; comprehensive adds <code>transcript-patterns</code>. Grounding chunks come back in <code>candidates[0].grounding_metadata.grounding_chunks[]</code> with <code>retrieved_context.title</code> and <code>.text</code>; the summary copies them to <code>citations[] = {citation_number, source}</code>. Budgets: comprehensive <code>thinking_budget=8192</code> (16,384 on safety hit), <code>max_output_tokens=2560</code>; summary <code>thinking_budget=24576</code>, <code>max_output_tokens=4096</code>, <code>temperature=0.2</code>.</p>
-<h2>Deployment facts that affect retrieval</h2>
-<ul>
-<li>Runtime service account <code>420536872556-compute@developer.gserviceaccount.com</code> holds <code>roles/discoveryengine.viewer</code> and <code>roles/aiplatform.user</code>.</li>
-<li>Online, the four containers run in one Cloud Run service (<code>ther-assist-sidecar</code>) behind nginx: <code>/api/analysis/</code> → :8081, <code>/api/storage/</code> → :8082, <code>/ws/</code> → :8083; ingress <code>all</code>, IAP on, invoker = IAP service agent only.</li>
-<li>IAP forwards <code>X-Goog-IAP-JWT-Assertion</code> to the containers (observed 2026-09-23); it did not forward <code>X-Goog-Authenticated-User-Email</code>. The storage service accepts requests on that basis inside Cloud Run (<code>K_SERVICE</code> set); verifying the JWT signature is planned post-conference hardening.</li>
-<li>Log lines to grep, local (<code>error-log-analysis.txt</code>) or Cloud Run: <code>[RAG PREFETCH] Querying</code>, <code>[RAG PREFETCH] Completed in &lt;ms&gt; — N passages retrieved</code>, <code>[RAG PREFETCH] Failed</code>, <code>[RAG] Session type</code>, <code>Found N grounding chunks</code>, <code>Added N citations to session summary response</code>.</li>
-</ul>
-</main></body></html>
+<h3>Alert JSON schema (model output)</h3>
+<pre><code>{
+  "alert": {
+    "timing": "now | pause | info",
+    "category": "safety | technique | pathway_change | engagement | process",
+    "title": "Brief descriptive title",
+    "message": "Specific action or observation (1-3 sentences)",
+    "evidence": ["quote(s) from the patient"],
+    "recommendation": ["up to 3 actions"],
+    "immediateActions": ["step to take right now"],
+    "contraindications": ["what to avoid"],
+    "crisis_resources": ["required for safety alerts, e.g. 988 Suicide &amp; Crisis Lifeline"]
+  }
+}</code></pre>
+<p>The backend adds <code>timestamp</code>, <code>session_phase</code>, <code>analysis_type</code>, <code>prompt_used</code> (strict / non-strict), <code>trigger_phrase_detected</code>, <code>safety_keywords_detected</code>, <code>job_id</code> and <code>_diagnostics</code> (model, latency_ms, ttft_ms, token_usage incl. thinking tokens, finish_reason, rag_tools, grounding.chunks_retrieved, json_parse_success, used_fallback). The frontend then de-duplicates (Jaccard similarity on title and message, 3 s hard block, per-category throttles) and shows the card.</p>
+
+<h2><span class="n">05</span>Comprehensive and summary paths</h2>
+<p class="lead">Here Gemini searches the corpus itself: the datastores are attached as Vertex AI Search grounding tools, the model issues its own queries while reasoning, and every passage it relies on comes back as a grounding chunk that becomes a citation.</p>
+<table>
+<tr><th>Aspect</th><th>Comprehensive analysis</th><th>Session summary</th></tr>
+<tr><td>Trigger</td><td>Same word trigger; skipped while one is in flight</td><td>Therapist ends the session</td></tr>
+<tr><td>Model / thinking</td><td><code>gemini-2.5-pro</code>, budget 8,192 (16,384 on safety hit), max output 2,560</td><td><code>gemini-2.5-pro</code>, budget 24,576, max output 4,096, temperature 0.2</td></tr>
+<tr><td>Tools</td><td>ebt-corpus, safety-crisis, modality corpora, transcript-patterns</td><td>ebt-corpus, safety-crisis, modality corpora</td></tr>
+<tr><td>Output</td><td>engagement, alliance, emotional state, arousal; pathway indicators; modality suggestion; diarized transcript</td><td>key moments with timestamps, techniques, risk assessment, homework, follow-ups, citations</td></tr>
+<tr><td>Seen today</td><td>60–73 grounding chunks per call</td><td>9 citations (local Jane Doe run), 67 chunks (short-cut run)</td></tr>
+</table>
+<p>Tools are built once at import time (<code>MANUAL_RAG_TOOL</code>, <code>SAFETY_RAG_TOOL</code>, <code>CBT_RAG_TOOL</code>, <code>BA_RAG_TOOL</code>, <code>DBT_RAG_TOOL</code>, <code>IPT_RAG_TOOL</code>, <code>TRANSCRIPT_RAG_TOOL</code>). Grounding chunks arrive in <code>candidates[0].grounding_metadata.grounding_chunks[]</code> with <code>retrieved_context.title</code> and <code>.text</code>; the summary copies them into <code>citations[] = {citation_number, source}</code>, which is why a summary response is ~143 KB of which ~133 KB is citation text.</p>
+
+<h2><span class="n">06</span>What the corpus actually returned today</h2>
+<p class="lead">Real results, not illustrations. The first block is the real-time prefetch for a Jane Doe passage about her activity log, Saturday baking with her sister, and robbery nightmares, run against the four CBT-session datastores on 2026-09-23.</p>
+<div class="chunk"><span class="src">Deliberate Practice in CBT — Boswell &amp; Constantino (APA)</span><span class="ds">ebt-corpus</span><div class="q">"Annotated Cognitive Behavioral Therapy Transcript 2 — THERAPIST: Here's what I'm thinking for our agenda today, and, as always…"</div></div>
+<div class="chunk"><span class="src">Prolonged Exposure Therapy for PTSD — Clinical Manual (2022)</span><span class="ds">ebt-corpus</span><div class="q">"Suddenly feeling or acting as if the stressful experience were actually happening again (as if you were actually back there reliving it)?"</div></div>
+<div class="chunk"><span class="src">Comprehensive CBT for Social Phobia — Treatment Manual</span><span class="ds">ebt-corpus</span><div class="q">"COGNITIVE DISTORTIONS — All-or-Nothing Thinking: You see things in black and white categories. If your performance falls short of perfect…"</div></div>
+<div class="chunk"><span class="src">SAMHSA National Guidelines for Crisis Care</span><span class="ds">safety-crisis</span><div class="q">"The Elephant in the Room: Mental Health Professionals Experience Crisis Too — as symptoms increased…"</div></div>
+<div class="chunk"><span class="src">SAMHSA TIP 50 — Addressing Suicidal Thoughts and Behaviors in Substance Abuse Treatment</span><span class="ds">safety-crisis</span><div class="q">Case dialogue on family strain and caretaking burden.</div></div>
+<div class="chunk"><span class="src">CBT_098_PMC4185428 — sleep intervention trial</span><span class="ds">cbt-corpus</span><div class="q">"Sleep Diary Variables — participants completed an average of 12.3 (SD 4.0) out of 14 scheduled days…"</div></div>
+<div class="chunk"><span class="src">CBT Evidence Base — Core Overview Paper</span><span class="ds">cbt-corpus</span><div class="q">"Case Vignettes — pediatric obsessive-compulsive disorder case example…"</div></div>
+<div class="chunk"><span class="src">Boswell et al. 2017, Psychotherapy — Behavioral Activation</span><span class="ds">ba-corpus</span><div class="q">"Therapist: This is pretty crude, but it sounds like you are really in a rut. Right now, most…"</div></div>
+<div class="chunk"><span class="src">Therapist tips for Brief Behavioural Activation Treatment for Depression — Revised (BATD-R)</span><span class="ds">ba-corpus</span><div class="q">"…know more about what your life is like. In some cases, if you're sleeping or eating, you might just write something pretty…" (activity monitoring instructions)</div></div>
+<p>Note what this shows: the query is the raw conversation, so hits mix the highly relevant (BATD-R activity monitoring, the PE manual's re-experiencing item, the BA transcript) with the loosely related (a pediatric OCD vignette, a sleep-diary methods paragraph). The model is told these are evidence to ground on; it decides which to use, and the alert it produced for this passage was "Behavioral Activation Opportunity".</p>
+<h3>Grounding chunks on the comprehensive path: the full list</h3>
+<p>The comprehensive analysis of the Jane Doe transcript (CBT, 8 minutes, run through the local service on 2026-09-23) returned <b>60 grounding chunks from 51 distinct sources</b>. Every one of them is listed below, grouped by shelf. This is the actual material Gemini had open while it scored engagement, alliance, emotional state and arousal and wrote the pathway guidance.</p>
+<div class="grid">
+  <div class="card c-cyan"><h4>Therapy manuals (ebt-corpus)</h4><p>Prolonged Exposure Therapy for PTSD — Clinical Manual (2022) · Exposure Therapy Manuals and Guidebooks — Reference Guide · Comprehensive CBT for Social Phobia — Treatment Manual · Deliberate Practice in CBT (Boswell &amp; Constantino, APA) · Cognitive Behavioral Therapy for Depression · Cognitive Behavioral Therapy for Insomnia (CBT-I): A Primer · Cognitive Behavioral Therapy for the Treatment of Psychiatric Disorders</p></div>
+  <div class="card c-violet"><h4>Session transcripts (transcript-patterns)</h4><p>Ten Prolonged Exposure session excerpts, matched on the trauma-processing pattern: childhood trauma (83_P10) · divorce or relationship breakup (393_P8) · imprisonment (200_P6) · natural disaster (387_P11, 84_P10) · police brutality (77_P8) · racial trauma (331_P8) · refugee experiences (396_P5, 39_P8) · severe illness (372_P7)</p></div>
+  <div class="card c-mint"><h4>Behavioral activation (ba-corpus)</h4><p>A Comparative Study of Group Behavioral Activation and Cognitive Therapy in Reducing Subsyndromal Anxiety and Depressive Symptoms · Behavioural activation therapy for anxiety disorders in adults · Behavioral activation therapy for depression and anxiety in cancer patients: a case series</p></div>
+  <div class="card c-amber"><h4>CBT research (cbt-corpus), on topic</h4><p>Group CBT for Veterans with Chronic PTSD (RCT) · CBT for PTSD in Severe Mental Illness (RCT) · CBT for PTSD in terrorist-affected people in Thailand (effectiveness trial) · CBT for the treatment of PTSD: a review · CBT for anxiety disorders: an update on the empirical evidence · Culturally Adapted CBT for Chinese Americans with Depression (RCT) · Culturally Adapted Mental Health Education Programs for Migrant Populations · Mindfulness Components and Their Clinical Efficacy · Emotion Regulation Interventions for Cancer Patients · Late-Onset Depression in an Aging World · CBT_072_PMC7001356</p></div>
+  <div class="card c-rose"><h4>CBT research (cbt-corpus), off topic</h4><p>Clinical practice guidelines for OCD (2025) · Clinical practice guideline for depression in India · Exploring MDMA-assisted therapy in eating disorders · Eating disorder symptoms and evidence-based treatments · Existential therapy for chronic pain · CBT for chronic pain and gender differences in empathy · CBT for anxiety in Parkinson's disease · Integrating CBT into music therapy · Case report: intussusception due to pica in an adolescent</p></div>
+</div>
+<p>Read it this way: about three-quarters of the chunks are squarely relevant (PE manual and PE session excerpts for the robbery trauma and nightmares; BA papers for the activity log; CBT-for-PTSD trials; the deliberate-practice transcript for agenda-setting), and about a quarter are semantic near-misses from the 196-document CBT research shelf. Gemini receives all 60, is told they are evidence, and chooses what to use at reasoning time; the near-misses cost tokens and a little latency, not accuracy, but they are the case for tighter curation of the CBT shelf.</p>
+<h3>Citations on the session summary</h3>
+<p>The summary for the same transcript returned <b>67 grounding chunks from 50 distinct sources</b> and rated risk <b>moderate</b> with 6 key moments. Beyond the manuals above it drew on the safety shelf (<i>SAMHSA SAFE-T Suicide Assessment</i>, <i>C-SSRS Baseline Screening</i>, <i>SAMHSA National Guidelines for Crisis Care</i>, <i>SAMHSA TIP 50</i>) for the passive-ideation moment, and on BA sources for the homework plan (<i>Brief Stepped Behavioral Activation for Primary Care</i>, <i>BA and exposure-based therapy for GAD (RCT)</i>, <i>BA, cognitive therapy and antidepressant medication in relapse prevention (RCT)</i>, <i>The Adolescent Behavioral Activation Program</i>, <i>BA for depression in older people</i>). The off-topic tail was similar in kind: postpartum-depression reviews, a type-2-diabetes psychoeducation review, a PCOS network meta-analysis, a Korean medication algorithm, and a few PDFs whose titles are file names (<code>PSM1300209</code>, <code>pone.0100100</code>, a Cochrane render).</p>
+
+<h2><span class="n">07</span>Verifying RAG is active, and what has gone wrong</h2>
+<div class="note">RAG is verified from the logs, never from the screen. A session can look normal while retrieval silently returns nothing; that is exactly what happened before 2026-09-18.</div>
+<table>
+<tr><th>Log line (error-log-analysis.txt locally · Cloud Run logs for ther-assist-sidecar online)</th><th>Healthy</th><th>Broken</th></tr>
+<tr><td><code>[RAG PREFETCH] Querying 4 datastores for CBT: [...]</code></td><td class="ok">one per real-time call</td><td class="bad">missing</td></tr>
+<tr><td><code>[RAG PREFETCH] Completed in &lt;ms&gt; — N passages retrieved</code></td><td class="ok">N ≥ 3</td><td class="bad">N = 0 on every call</td></tr>
+<tr><td><code>[RAG PREFETCH] Failed to query &lt;datastore&gt;: ...</code></td><td class="ok">absent</td><td class="bad">present</td></tr>
+<tr><td><code>[RAG] Session type 'CBT' → tools: ebt-corpus + safety-crisis + ...</code></td><td class="ok">one per comprehensive call</td><td class="bad">missing</td></tr>
+<tr><td><code>Found N grounding chunks</code></td><td class="ok">N ≥ 20</td><td class="bad">0</td></tr>
+<tr><td><code>Added N citations to session summary response</code></td><td class="ok">N ≥ 1</td><td class="bad">0</td></tr>
+</table>
+<div class="grid">
+  <div class="card c-rose"><h4>Enterprise-only request on a standard datastore · fixed 2026-09-18</h4><p><code>_query_datastore</code> asked for extractive answers; every call was rejected with 400, the <code>except</code> swallowed it as a warning, and real-time guidance ran ungrounded while looking fine. Snippets-only fixed it: 0 → 7–10 passages per call.</p></div>
+  <div class="card c-rose"><h4>Thinking ate the output budget · fixed 2026-09-18</h4><p>Dynamic thinking on gemini-2.5-flash consumed up to 979 of 1,024 tokens; alerts arrived title-only ("undefined" on screen) and crashed the session. <code>thinking_budget=0</code> and a null guard fixed it.</p></div>
+  <div class="card c-amber"><h4>Duplicate requests · fixed 2026-09-18</h4><p>Every trigger fired twice from a React state updater under StrictMode; 80 requests per test session became 41.</p></div>
+  <div class="card c-amber"><h4>Storage service rejected the placeholder token online · fixed 2026-09-23</h4><p>The deployed frontend runs without Firebase; the storage service rejected its placeholder token, so Example Audio failed with 401. Inside Cloud Run the service now accepts requests that arrived through IAP (IAP forwards <code>X-Goog-IAP-JWT-Assertion</code>, not the email header).</p></div>
+  <div class="card c-violet"><h4>Early "ended" from Chrome's audio element · guarded 2026-09-23</h4><p>Chrome fired <code>ended</code> 8:40 into an intact 32-minute MP3 and the session stopped. An <code>ended</code> more than 2 s before the known duration is now logged and playback resumes.</p></div>
+  <div class="card c-violet"><h4>services replace switched IAP off · fixed 2026-09-23</h4><p>The service YAML lacked the IAP annotation; it is now pinned in the spec.</p></div>
+  <div class="card c-mint"><h4>Cache masking · by design</h4><p>Results are cached 25 s per modality; a cache hit shows no new query line. Normal within a burst.</p></div>
+  <div class="card c-mint"><h4>Permissions and network</h4><p>Runtime SA <code>420536872556-compute@…</code> holds <code>discoveryengine.viewer</code> and <code>aiplatform.user</code>; egress to <code>us-discoveryengine.googleapis.com</code>; a DNS race in the gRPC client was fixed in April by sharing one client.</p></div>
+</div>
+<p>What is deliberately not retrieved: clinician notes, the patient record, prior sessions' transcripts, anything typed in the UI. Configuration lives in <code>constants.py</code> (models, prompts, safety keyword lists, trigger phrases) and <code>main.py</code> (<code>modality_map</code>, <code>RAG_CACHE_TTL_SECONDS = 25</code>, <code>page_size = 3</code>, 10 s search timeout). The hard rule: local and online must always run through these datastores; every deploy is checked against the log lines above.</p>
+
+<h2><span class="n">08</span>Deployment facts that affect retrieval</h2>
+<div class="grid">
+  <div class="card c-cyan"><h4>Online topology</h4><p>One Cloud Run service, <code>ther-assist-sidecar</code>: nginx (:8080) → analysis :8081, storage :8082, websocket :8083. Ingress <code>all</code>, IAP on, invoker = IAP service agent only. Same code, same datastores as the local stack.</p></div>
+  <div class="card c-cyan"><h4>Identity behind IAP</h4><p>IAP forwards <code>X-Goog-IAP-JWT-Assertion</code>; it did not forward <code>X-Goog-Authenticated-User-Email</code> (observed 2026-09-23). Verifying the JWT signature in the storage and analysis services is post-conference hardening.</p></div>
+  <div class="card c-cyan"><h4>Verified today</h4><p>Local: 23/23 real-time calls through RAG, 13 comprehensive, 2 summaries, 0 truncations. Online: STT stream, transcript, and <code>[RAG PREFETCH] Completed in 1048 ms — 8 passages retrieved</code> on the deployed revision.</p></div>
+</div>
+
+<footer>TherAssist · SUNY Downstate / GCA IMH · generated 2026-09-23 from the code on branch demo-readiness-2026-09-18 and the day's service logs.</footer>
+</main>
+</body>
+</html>
