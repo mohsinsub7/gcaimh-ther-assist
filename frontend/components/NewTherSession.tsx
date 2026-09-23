@@ -173,7 +173,12 @@ const NewTherSession: React.FC<NewTherSessionProps> = ({
   ];
   const EXAMPLE_AUDIO_OPTIONS = [
     {
-      id: 'Jane Doe 6', name: 'Jane Doe — Session 6', description: 'Synthetic CBT session, PTSD + depression (~40 min)',
+      id: 'Jane Doe 6', name: 'Jane Doe — Session 6', description: 'Synthetic CBT session, PTSD + depression (~8 min, full arc)',
+      localFile: '/audio/jane-doe-session-06-short.mp3',
+      gcsUri: `gs://${GCS_AUDIO_BUCKET}/jane-doe-session-06-short.mp3`,
+    },
+    {
+      id: 'Jane Doe 6 full', name: 'Jane Doe — Session 6 (full)', description: 'Same synthetic session, complete (~32 min)',
       localFile: '/audio/jane-doe-session-06.mp3',
       gcsUri: `gs://${GCS_AUDIO_BUCKET}/jane-doe-session-06.mp3`,
     },

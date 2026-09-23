@@ -1,0 +1,347 @@
+[
+ {
+  "scene": 1,
+  "speaker": "THERAPIST",
+  "text": "Hi Jane, come on in. It’s good to see you."
+ },
+ {
+  "scene": 1,
+  "speaker": "CLIENT",
+  "text": "Hi, Dr. Alvarez. You too."
+ },
+ {
+  "scene": 1,
+  "speaker": "THERAPIST",
+  "text": "Please, have a seat. So, to start us off like we usually do, how about we do a quick check-in on your mood? On that zero to ten scale, where zero is the lowest you’ve ever felt and ten is the best, where would you say your mood has been on average this past week?"
+ },
+ {
+  "scene": 1,
+  "speaker": "CLIENT",
+  "text": "Hmm. An average. I guess maybe a three."
+ },
+ {
+  "scene": 1,
+  "speaker": "THERAPIST",
+  "text": "A three. Okay. And how does that compare to last week, when I think you said you were around a two?"
+ },
+ {
+  "scene": 1,
+  "speaker": "CLIENT",
+  "text": "It’s a little better. Yeah. There were a couple of hours on Saturday that felt almost normal. So that pulled the average up, I think. But mostly it was still a two or a three. The lows are still very low."
+ },
+ {
+  "scene": 1,
+  "speaker": "THERAPIST",
+  "text": "I understand. But it’s significant that you’re noticing those moments that feel a bit lighter. That’s a real shift."
+ },
+ {
+  "scene": 1,
+  "speaker": "CLIENT",
+  "text": "I guess so. It’s just hard to hold onto."
+ },
+ {
+  "scene": 1,
+  "speaker": "THERAPIST",
+  "text": "I know it is. We can talk more about that. So, a three for mood. What about anxiety? Using that same zero to ten scale."
+ },
+ {
+  "scene": 1,
+  "speaker": "CLIENT",
+  "text": "That’s been higher. Maybe a six. It spikes a lot."
+ },
+ {
+  "scene": 1,
+  "speaker": "THERAPIST",
+  "text": "Okay, a six. Thank you for that. It gives us a good starting point. Tell me a bit more about the week overall. What stood out?"
+ },
+ {
+  "scene": 1,
+  "speaker": "CLIENT",
+  "text": "Well, the usual. I’m just so tired. All the time. Getting out of bed feels like climbing a mountain. I did the dishes a couple of times. I made myself do that. But mostly I just sat. Watched TV but didn't really see it, you know?"
+ },
+ {
+  "scene": 1,
+  "speaker": "THERAPIST",
+  "text": "I do. That feeling of exhaustion and just not being able to connect is very common with depression. It takes a huge amount of energy just to do the basics."
+ },
+ {
+  "scene": 1,
+  "speaker": "CLIENT",
+  "text": "Yeah. It really does."
+ },
+ {
+  "scene": 1,
+  "speaker": "THERAPIST",
+  "text": "How has your sleep been? You mentioned being tired."
+ },
+ {
+  "scene": 1,
+  "speaker": "CLIENT",
+  "text": "It’s been bad. Really broken. I can fall asleep okay, but then I wake up at two or three in the morning and my heart is pounding."
+ },
+ {
+  "scene": 1,
+  "speaker": "THERAPIST",
+  "text": "And the nightmares?"
+ },
+ {
+  "scene": 1,
+  "speaker": "CLIENT",
+  "text": "I had two this week. The same one. About the robbery. I wake up and I can’t get the man’s voice out of my head. It takes an hour or more to feel safe enough to even try to sleep again. And then I’m just exhausted and angry the next day."
+ },
+ {
+  "scene": 1,
+  "speaker": "THERAPIST",
+  "text": "That sounds incredibly draining. Waking up like that is a jolt to your whole system, and it makes sense that it would leave you feeling depleted and irritable the next day."
+ },
+ {
+  "scene": 1,
+  "speaker": "CLIENT",
+  "text": "Yeah. My sister called on Tuesday and I pretty much bit her head off for no reason. I felt bad about it after."
+ },
+ {
+  "scene": 1,
+  "speaker": "THERAPIST",
+  "text": "We can definitely think about that irritability. It’s often connected to the poor sleep and the high anxiety."
+ },
+ {
+  "scene": 1,
+  "speaker": "CLIENT",
+  "text": "Okay."
+ },
+ {
+  "scene": 1,
+  "speaker": "THERAPIST",
+  "text": "So, thank you for that update. It sounds like a challenging week, with a few small moments of relief, but still dominated by low energy, anxiety, and poor sleep from the nightmares."
+ },
+ {
+  "scene": 1,
+  "speaker": "CLIENT",
+  "text": "That about sums it up."
+ },
+ {
+  "scene": 1,
+  "speaker": "THERAPIST",
+  "text": "Okay. So, with all that in mind, shall we set an agenda for our session today? To make sure we use our time well."
+ },
+ {
+  "scene": 1,
+  "speaker": "CLIENT",
+  "text": "Sure."
+ },
+ {
+  "scene": 1,
+  "speaker": "THERAPIST",
+  "text": "Great. Based on our plan, I was thinking we could spend some time reviewing the activity log you were working on for your homework."
+ },
+ {
+  "scene": 1,
+  "speaker": "CLIENT",
+  "text": "Okay. I did it. Mostly."
+ },
+ {
+  "scene": 1,
+  "speaker": "THERAPIST",
+  "text": "That’s fantastic, Jane. No problem if it wasn't perfect. The goal is just to gather information. Then, I’d like to talk about the next step on your exposure hierarchy. I know that’s a tough topic, but a really important one."
+ },
+ {
+  "scene": 1,
+  "speaker": "CLIENT",
+  "text": "Right. The one we talked about last week."
+ },
+ {
+  "scene": 1,
+  "speaker": "THERAPIST",
+  "text": "Exactly. And finally, I thought we could look at the activity log and choose one or two small, new behavioral activation goals for the coming week. Things that might help create a few more of those moments like you had on Saturday. How does that sound as a plan?"
+ },
+ {
+  "scene": 1,
+  "speaker": "CLIENT",
+  "text": "It sounds like a lot. But okay. It makes sense."
+ },
+ {
+  "scene": 1,
+  "speaker": "THERAPIST",
+  "text": "We’ll take it one step at a time. And is there anything else you wanted to be sure to talk about today? Anything I’ve missed?"
+ },
+ {
+  "scene": 1,
+  "speaker": "CLIENT",
+  "text": "No, I don’t think so. That covers it. Reviewing the homework, the exposure thing, and a new plan."
+ },
+ {
+  "scene": 1,
+  "speaker": "THERAPIST",
+  "text": "Perfect. Then let's start with the homework. Can you tell me a bit about how it went filling out that activity log?"
+ },
+ {
+  "scene": 2,
+  "speaker": "THERAPIST",
+  "text": "That’s really good to hear. Those couple of hours on Saturday… was that when you were planning to try baking those cookies for your sister?"
+ },
+ {
+  "scene": 2,
+  "speaker": "CLIENT",
+  "text": "Yeah. It was. I actually did it. She came over and we had them with some tea."
+ },
+ {
+  "scene": 2,
+  "speaker": "THERAPIST",
+  "text": "Jane, that’s fantastic. That’s a big step. How did it feel while you were doing it?"
+ },
+ {
+  "scene": 2,
+  "speaker": "CLIENT",
+  "text": "The baking part was… okay. I measured everything wrong at first and almost just threw it all out. But I started over. It was distracting, I guess. And it was nice seeing Sarah. For a little bit."
+ },
+ {
+  "scene": 2,
+  "speaker": "THERAPIST",
+  "text": "I hear a ‘but’ coming."
+ },
+ {
+  "scene": 2,
+  "speaker": "CLIENT",
+  "text": "But then she started talking about applying for a new job, and I just… shut down. I felt that familiar wave of… I don’t know. Uselessness. The good feeling was gone."
+ },
+ {
+  "scene": 2,
+  "speaker": "THERAPIST",
+  "text": "That sounds like a perfect moment to talk about the other part of the homework. The thought record. It sounds like you had a very strong shift in your feelings right then. Did you get a chance to use the worksheet?"
+ },
+ {
+  "scene": 2,
+  "speaker": "CLIENT",
+  "text": "I tried. I did it once earlier in the week. And it kind of helped, a little. But with this one, I just… I couldn’t."
+ },
+ {
+  "scene": 2,
+  "speaker": "THERAPIST",
+  "text": "That’s perfectly okay. It’s a hard skill to use, especially when the feeling is intense. Can we try to walk through it together now? What was going through your mind when your sister was talking about her job search?"
+ },
+ {
+  "scene": 2,
+  "speaker": "CLIENT",
+  "text": "Just… she’s moving on with her life. Everyone is. And I’m just… stuck. I’m not even the person I was nine months ago. I’m just this broken thing that can’t even go to the grocery store."
+ },
+ {
+  "scene": 2,
+  "speaker": "THERAPIST",
+  "text": "Okay. So, a lot of thoughts there. Let’s try to find the ‘hot thought’—the one that felt the most powerful, the one that really stung."
+ },
+ {
+  "scene": 2,
+  "speaker": "CLIENT",
+  "text": "I think it’s… ‘I’m useless now.’"
+ },
+ {
+  "scene": 2,
+  "speaker": "THERAPIST",
+  "text": "‘I’m useless now.’ Okay. Let’s write that down. On a scale of 0 to 100, how much did you believe that thought in that moment?"
+ },
+ {
+  "scene": 2,
+  "speaker": "CLIENT",
+  "text": "Oh, 100. Absolutely."
+ },
+ {
+  "scene": 2,
+  "speaker": "THERAPIST",
+  "text": "And what was the feeling that went with it?"
+ },
+ {
+  "scene": 2,
+  "speaker": "CLIENT",
+  "text": "Sadness. Hopelessness. A bit of shame, I guess."
+ },
+ {
+  "scene": 2,
+  "speaker": "THERAPIST",
+  "text": "Okay. So now we do the part that feels a bit like being a detective. We look for evidence. What evidence did your mind present to you in that moment that supports the thought, ‘I’m useless now’?"
+ },
+ {
+  "scene": 2,
+  "speaker": "CLIENT",
+  "text": "Well, the most obvious one. I can’t work. I can’t even walk down the street where my pharmacy is. I get shaky just thinking about it. Sarah is building a career, and I’m hiding in my house. I’m not contributing anything."
+ },
+ {
+  "scene": 2,
+  "speaker": "THERAPIST",
+  "text": "Okay. So, evidence for: you’re not working right now, and you’re avoiding certain places because of the anxiety. That feels very real. Anything else?"
+ },
+ {
+  "scene": 2,
+  "speaker": "CLIENT",
+  "text": "I’m irritable with everyone. I snap at my sister. I can’t even listen to my friend talk about her promotion without feeling this… awfulness. A useful person wouldn’t do that."
+ },
+ {
+  "scene": 9,
+  "speaker": "THERAPIST",
+  "text": "I want to pause here, because we have covered a lot already, and I would rather stop at a good place than rush the next piece."
+ },
+ {
+  "scene": 9,
+  "speaker": "CLIENT",
+  "text": "Okay. That is fine."
+ },
+ {
+  "scene": 9,
+  "speaker": "THERAPIST",
+  "text": "Let me summarise what I heard today. Sleep is still rough, but there were a couple of hours on Saturday that felt almost normal. You did the thought record twice, and the second time it fell apart, and we found the thought underneath it: it doesn't count."
+ },
+ {
+  "scene": 9,
+  "speaker": "CLIENT",
+  "text": "Yes. That one keeps showing up."
+ },
+ {
+  "scene": 9,
+  "speaker": "THERAPIST",
+  "text": "So the homework this week is small on purpose. One thought record, and when the it-doesn't-count thought appears, you write it down as its own line instead of letting it cancel the evidence. That is the whole task."
+ },
+ {
+  "scene": 9,
+  "speaker": "CLIENT",
+  "text": "One record. And catch that thought."
+ },
+ {
+  "scene": 9,
+  "speaker": "THERAPIST",
+  "text": "Exactly. And the safety plan card stays in your wallet, same as always. If the nights get worse, you call the number on it, and you can leave me a message any time."
+ },
+ {
+  "scene": 9,
+  "speaker": "CLIENT",
+  "text": "I will. I have it with me."
+ },
+ {
+  "scene": 9,
+  "speaker": "THERAPIST",
+  "text": "Before we finish, same question as the start. Zero to ten, where is your mood right now?"
+ },
+ {
+  "scene": 9,
+  "speaker": "CLIENT",
+  "text": "Maybe a four. A little lighter than when I came in."
+ },
+ {
+  "scene": 9,
+  "speaker": "THERAPIST",
+  "text": "A three to a four. I will take that. Anything about today that did not work for you, or that you want me to do differently next time?"
+ },
+ {
+  "scene": 9,
+  "speaker": "CLIENT",
+  "text": "No. It helped to slow down on the thought record instead of me just feeling like I failed it."
+ },
+ {
+  "scene": 9,
+  "speaker": "THERAPIST",
+  "text": "Good. Then same time next week. We will pick up the exposure step then, when we have the whole hour for it. Thank you for the work you did today, Jane."
+ },
+ {
+  "scene": 9,
+  "speaker": "CLIENT",
+  "text": "Thank you, Dr. Alvarez. See you next week."
+ }
+]

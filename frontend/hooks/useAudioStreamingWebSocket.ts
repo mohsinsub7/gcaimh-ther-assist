@@ -451,8 +451,17 @@ export const useAudioStreamingWebSocket = ({
       source.connect(processingNode);
       source.connect(ctx.destination);
 
-      // Handle audio end
+      // Handle audio end. Chrome has been seen firing 'ended' part-way through a
+      // long, intact MP3 (at ~520 s of a 1950 s file), which took the whole
+      // session down. Treat an 'ended' that arrives well before the known
+      // duration as spurious: log it, resume, and keep streaming.
       audioEl.addEventListener('ended', () => {
+        const dur = audioEl.duration;
+        if (isFinite(dur) && dur > 0 && audioEl.currentTime < dur - 2) {
+          console.warn(`[AudioFile] 'ended' fired early at ${audioEl.currentTime.toFixed(1)}s of ${dur.toFixed(1)}s — resuming`);
+          audioEl.play().catch(err => console.error('[AudioFile] resume after early end failed:', err));
+          return;
+        }
         setIsPlayingAudio(false);
         setAudioProgress(100);
         stopStreaming();
